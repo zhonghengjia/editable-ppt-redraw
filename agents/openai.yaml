@@ -1,0 +1,4 @@
+interface:
+  display_name: "图片转 PPT Skill · Editable Visual Reconstruction"
+  short_description: "将参考图在本机重建为可验证、可编辑的多格式视觉"
+  default_prompt: "Use $editable-ppt-redraw（图片转ppt skill）将我提供的参考视觉在本机重建为可编辑文件，并根据我的后续编辑工具选择 PPTX、SVG、draw.io 或其他合适格式。"

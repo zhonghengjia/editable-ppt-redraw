@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "repo": "lucide-icons/lucide",
+  "commit": "94e4cb9d9db5907053ebf3636a97c45529cf776b",
+  "license": "ISC",
+  "license_path": "assets/lucide/LICENSE",
+  "policy": "Use only after source recognition-signature comparison; library match is not source identity.",
+  "assets": [
+    {
+      "id": "stethoscope",
+      "path": "assets/lucide/stethoscope.svg",
+      "source_url": "https://github.com/lucide-icons/lucide/blob/94e4cb9d9db5907053ebf3636a97c45529cf776b/icons/stethoscope.svg",
+      "source_sha256": "a5621a048bcb911d4d51a6b8e6b5821dc68b0e7554dc001389ee9bc5f251c3ad",
+      "bundled_sha256": "a5621a048bcb911d4d51a6b8e6b5821dc68b0e7554dc001389ee9bc5f251c3ad",
+      "geometry_modified": false
+    },
+    {
+      "id": "ambulance",
+      "path": "assets/lucide/ambulance.svg",
+      "source_url": "https://github.com/lucide-icons/lucide/blob/94e4cb9d9db5907053ebf3636a97c45529cf776b/icons/ambulance.svg",
+      "source_sha256": "d7147fa84d4f5006071acef37a0c9b5aa46830974960a0bf3224d2ba7e80e69e",
+      "bundled_sha256": "d7147fa84d4f5006071acef37a0c9b5aa46830974960a0bf3224d2ba7e80e69e",
+      "geometry_modified": false
+    },
+    {
+      "id": "heart-pulse",
+      "path": "assets/lucide/heart-pulse.svg",
+      "source_url": "https://github.com/lucide-icons/lucide/blob/94e4cb9d9db5907053ebf3636a97c45529cf776b/icons/heart-pulse.svg",
+      "source_sha256": "103d6b99ac9ab53c5861317673880ae5d6e2491efa7a40e8b89ecac449842df2",
+      "bundled_sha256": "103d6b99ac9ab53c5861317673880ae5d6e2491efa7a40e8b89ecac449842df2",
+      "geometry_modified": false
+    }
+  ]
+}

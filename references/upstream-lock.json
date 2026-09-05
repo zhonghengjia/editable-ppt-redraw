@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "version": "2.5.0",
+  "review_date": "2026-09-05",
+  "components": [
+    {
+      "repo": "JamieJustTang/svg2pptx-skill",
+      "commit": "876c188e34fefc3c4e24919494c752edf25d1ae9",
+      "source_path": "scripts/svg_to_pptx/drawingml_paths.py",
+      "source_url": "https://github.com/JamieJustTang/svg2pptx-skill/blob/876c188e34fefc3c4e24919494c752edf25d1ae9/scripts/svg_to_pptx/drawingml_paths.py",
+      "source_sha256": "68b52e51a07e9e3a6f4b9d5431f5f983b4fff6a1796ede34a07081616fc5fad8",
+      "bundled_path": "scripts/vendor/svg_paths/drawingml_paths.py",
+      "bundled_sha256": "02f3acb9728c35f334959e1605e3c0a6ad35b06ed04cb32b5c9e1d028fc06753",
+      "license": "MIT",
+      "license_path": "scripts/vendor/svg_paths/LICENSE",
+      "modifications": [
+        "Strict malformed/incomplete/nonfinite path validation",
+        "Arc flag/radius validation",
+        "Closed-subpath current-point reset"
+      ],
+      "upstream_test_suite_executed": false
+    }
+  ]
+}
