@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -58,7 +59,16 @@ def extract_curve_trace(
     min_peak_prominence: float = 0.08,
     min_peak_distance: float = 0.06,
     smoothing_window: int = 5,
+    min_column_coverage: float = 0.90,
+    max_gap_fraction: float = 0.05,
 ) -> dict[str, object]:
+    for name, value in (("min_column_coverage", min_column_coverage), ("max_gap_fraction", max_gap_fraction)):
+        if not math.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError(f"{name} must be finite in [0, 1]")
+    if not colors or not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("nonempty colors and finite nonnegative tolerance required")
+    if len(bbox) != 4 or min(bbox[:2]) < 0 or min(bbox[2:]) < 2:
+        raise ValueError("invalid crop bbox")
     with Image.open(image_path) as source:
         rgb = source.convert("RGB")
         x, y, width, height = bbox
@@ -87,6 +97,19 @@ def extract_curve_trace(
         else:
             raise ValueError(f"unsupported mode: {mode}")
 
+    coverage = float(has_signal.mean())
+    gap = longest_gap(has_signal)
+    # Do not manufacture a complete trace across unobserved regions.
+    if coverage < min_column_coverage or gap / width > max_gap_fraction or not has_signal[0] or not has_signal[-1]:
+        return {
+            "schema_version": 2, "status": "fail", "points": [], "peaks": [],
+            "reason": "insufficient observed columns, excessive gap, or unobserved crop endpoints",
+            "source_image": str(image_path.resolve()),
+            "source_sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
+            "bbox_px": list(bbox),
+            "trace_quality": {"column_coverage": coverage, "longest_missing_run_px": gap,
+                              "min_column_coverage": min_column_coverage, "max_gap_fraction": max_gap_fraction},
+        }
     known = np.flatnonzero(~np.isnan(selected))
     all_columns = np.arange(width)
     selected = np.interp(all_columns, known, selected[known])
@@ -104,7 +127,7 @@ def extract_curve_trace(
         maximum = float(signal.max())
         if maximum <= 0:
             raise ValueError("extracted envelope has zero amplitude; check baseline or color")
-        signal /= maximum
+        signal /= height - 1
 
     points = [[index / (width - 1), float(value)] for index, value in enumerate(signal)]
     profile = interpolate_profile(points)
@@ -116,7 +139,11 @@ def extract_curve_trace(
     )
     valleys = valleys_between_peaks(profile, peaks)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "status": "pass",
+        "normalization": "crop_height",
+        "baseline_normalized": (float(height - 1 if baseline_y is None else baseline_y) / (height - 1)),
+        "source_sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
         "source_image": str(image_path.resolve()),
         "bbox_px": list(bbox),
         "mode": mode,
@@ -127,6 +154,9 @@ def extract_curve_trace(
         "valleys": valleys,
         "trace_quality": {
             "column_coverage": float(has_signal.mean()),
+            "interpolated_columns": np.flatnonzero(~has_signal).tolist(),
+            "min_column_coverage": min_column_coverage,
+            "max_gap_fraction": max_gap_fraction,
             "longest_missing_run_px": longest_gap(has_signal),
             "width_px": width,
             "height_px": height,
@@ -147,6 +177,8 @@ def main() -> int:
     parser.add_argument("--min-peak-prominence", type=float, default=0.08)
     parser.add_argument("--min-peak-distance", type=float, default=0.06)
     parser.add_argument("--smoothing-window", type=int, default=5)
+    parser.add_argument("--min-column-coverage", type=float, default=0.90)
+    parser.add_argument("--max-gap-fraction", type=float, default=0.05)
     args = parser.parse_args()
     try:
         report = extract_curve_trace(
@@ -159,6 +191,8 @@ def main() -> int:
             min_peak_prominence=args.min_peak_prominence,
             min_peak_distance=args.min_peak_distance,
             smoothing_window=args.smoothing_window,
+            min_column_coverage=args.min_column_coverage,
+            max_gap_fraction=args.max_gap_fraction,
         )
     except (OSError, ValueError) as exc:
         print(f"Cannot extract curve trace: {exc}", file=sys.stderr)
@@ -170,7 +204,7 @@ def main() -> int:
         f"points={len(report['points'])}, peaks={len(report['peaks'])}, "
         f"coverage={report['trace_quality']['column_coverage']:.3f}, output={args.output.resolve()}"
     )
-    return 0
+    return 0 if report["status"] == "pass" else 1
 
 
 if __name__ == "__main__":

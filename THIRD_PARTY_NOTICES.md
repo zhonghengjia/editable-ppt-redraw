@@ -14,6 +14,12 @@ Source: [lucide-icons/lucide](https://github.com/lucide-icons/lucide/tree/94e4cb
 
 Selected assets: `assets/lucide/inventory.json`. Full upstream ISC/MIT notices: `assets/lucide/LICENSE`. Artwork geometry is unchanged; hashes distinguish source bytes from newline-normalized bundled bytes.
 
+## Local raster component tracing and comparison
+
+[ImageTracerJS](https://github.com/jankovicsandras/imagetracerjs), `imagetracer_v1.2.6.js`, is bundled byte-for-byte as `scripts/vendor/imagetracer/imagetracer.cjs` under the Unlicense; the complete upstream license is retained alongside it. [Pixelmatch](https://github.com/mapbox/pixelmatch), `index.js`, is bundled byte-for-byte as `scripts/vendor/pixelmatch/index.mjs` under ISC, with its complete license. Only filename extensions change to explicitly select Node module modes. Exact upstream tree/blob IDs, source/bundled hashes and license hashes are recorded in [upstream-lock.json](references/upstream-lock.json); no future HEAD update is automatic.
+
+`component-worker.mjs` and `component_fidelity.py` are original local adapters. No upstream models, network loading utilities or browser image-loading code are invoked. Their tests exercise selected integration behavior, not the entire upstream test suites.
+
 ## Existing dependencies
 
 The toolkit calls already available python-pptx, lxml and Pillow packages, each separately installed with its own license. No unlicensed, restricted-use or AGPL source code was incorporated.

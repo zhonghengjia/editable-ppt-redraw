@@ -84,13 +84,21 @@ For a manifest-backed structured visual, declare:
   "edge_roles": {
     "cohort-to-exclusion": {
       "role": "exclusion",
-      "output_name_regex": "^flow-cohort-to-exclusion-"
+      "output_name_regex": "^flow-cohort-to-exclusion-",
+      "endpoint_binding": {
+        "source_output_name": "cohort-box",
+        "target_output_name": "exclusion-box"
+      }
     }
   }
 }
 ```
 
-`node_roles` keys reference manifest module or source-inventory IDs. For connected diagrams, cover every connection endpoint. Each node-role record gives the semantic role, allowed output geometries, and exact output object names. `edge_roles` keys reference connection IDs and provide a semantic role plus a regex matching the named output line objects.
+`node_roles` keys reference manifest module or source-inventory IDs. Cover every connection endpoint. Node records give allowed geometries and exact output names. Edge records reference connection IDs and select actual output lines by regex. An `endpoint_binding` names the intended `source_output_name` and `target_output_name`; these must agree with the connection's node-role mapping.
+
+A reopened native line supplies `source_name` and `target_name` from its actual bindings. For an explicitly routed edge, also declare `ordered_output_names` covering the selected segments exactly; each reopened line supplies directed `endpoints: [[x1,y1],[x2,y2]]`, and rectangular endpoint nodes supply `bbox: [x,y,width,height]`. All coordinates use the same reopened-layout units; binding `tolerance` defaults to 0.01 of those units. The coordinate checker supports rectangular boundaries only; rounded/arbitrary nodes need actual native binding evidence or separate inspection. A bbox alone does not establish line direction.
+
+The report separates name/geometry `valid` from endpoint `status`. Missing endpoint evidence gives `NOT_VERIFIED`, not semantic success; wrong or discontinuous endpoints give `FAIL`. Arrowhead meaning and obstacle avoidance remain separate connector/render checks. Keep names unique across the audited layout set; if page-local names repeat, audit pages with their matching per-page contracts rather than guessing correspondence.
 
 ## Required QA
 

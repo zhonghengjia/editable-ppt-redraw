@@ -54,18 +54,18 @@ Do not install a renderer, desktop application, plugin, browser package, or syst
 
 - Prefer uncompressed `mxfile` / `diagram` / `mxGraphModel` XML so the source is inspectable and diffable.
 - Keep text, boxes, tables, lanes, and connectors as native cells. Use portable data-URI SVG assets only for reusable symbols that native geometry cannot express honestly.
-- Give every cell a unique ID. Every edge needs an `mxGeometry` child with `relative="1"`.
+- Give every cell a unique ID within its own `mxGraphModel`; separate pages may reuse root/layer IDs. Explicit edge `source`/`target` IDs must resolve within that model. An intentionally free endpoint instead requires the corresponding geometry `sourcePoint`/`targetPoint`. Every edge needs `mxGeometry relative="1"`.
 - If draw.io Desktop is locally available, export a preview and inspect it before delivery.
 
 ### Excalidraw
 
-- Use valid scene JSON with stable element IDs, bound text for labels, and explicit arrow bindings when appropriate.
+- Use valid scene JSON with unique active element IDs, bound text for labels, and explicit arrow bindings when appropriate. Active arrow, label/container, frame and `boundElements` references must resolve to active elements; null bindings are valid free endpoints.
 - Preserve the source's reading order and relationships while accepting the requested sketch-like representation.
 - Keep image elements exceptional and disclosed.
 
 ### Mermaid and Graphviz
 
-- Keep the source file as the canonical editable deliverable and render a preview as a derivative.
+- Keep the source file as the canonical editable deliverable and render a preview as a derivative. The bundled Mermaid/Graphviz audit is lexical screening, not a full parser; validate with the chosen installed native engine before claiming parsing succeeded.
 - Preserve node IDs, labels, edge directions, subgraphs or clusters, and semantic line styles.
 - Disclose layout differences caused by the engine rather than hand-editing the rendered derivative.
 

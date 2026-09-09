@@ -19,7 +19,7 @@ For a `fast` task, keep the signature in the working notes. For a `standard` or 
 
 ## Choose one coherent native representation
 
-Use the simplest representation that preserves the recognition signature:
+Use the simplest representation that preserves the selected reconstruction mode's requirements. For faithful source-specific scientific objects, side/cutaway views or layered complex symbols, read [component-fidelity.md](component-fidelity.md) before authoring; a recognition signature alone is insufficient. Use one native representation:
 
 1. Reuse the source's native object when editing an existing artifact in the same target format and the object is suitable.
 2. Use a small module of AutoShapes for geometry defined by circles, rectangles, polygons, and straight segments.
@@ -45,7 +45,7 @@ Run `scripts/audit-raster-asset-integrity.py <asset-or-directory> --fail-on-risk
 
 ## Construct by semantic parts
 
-Build the icon from its functional parts rather than from arbitrary geometric fragments. Each part should have a stable name and an intentional relationship to the others. Examples of part roles include a main body, paired tubes, a junction, a terminal ring, a handle, a neck, a blade, a sensor, or a support baseline.
+Build the icon from source-observed parts with stable names and intentional relationships. Distinguish independent parts from host-attached surface details before assigning geometry; use the shared-frame construction and relationship evidence in [component-fidelity.md](component-fidelity.md) for the latter. A main body, paired tubes or terminal ring can be independently positioned parts; a rib, band or surface marking cannot be positioned independently of its owning surface merely because it is separately selectable.
 
 Use these invariants:
 
@@ -70,4 +70,4 @@ For each reconstructed icon or symbol:
 7. For raster assets, confirm the integrity audit passes and the placed shape preserves the asset's aspect ratio.
 8. Confirm the icon remains native and editable, or is accurately disclosed as a movable raster exception, in the applicable editability or source audit.
 
-Block delivery when any defining component is missing, a continuous path is visibly disconnected, an unintended branch appears, a ring or hole closes, a terminal becomes indistinct, the symbol overlaps its label, or the result represents a different object class. Stop refinement when the source-grounded signature is recognizable at the delivered size, the module is editable, and no blocking defect remains; pixel-perfect ornament is not required.
+Block delivery when any defining component is missing, a continuous path is visibly disconnected, an unintended branch appears, a ring or hole closes, a terminal becomes indistinct, the symbol overlaps its label, or the result represents a different object class. In semantic mode, stop when the selected source-grounded invariant contract is met and the module is editable. In faithful mode, also satisfy the source-specific geometry and actual-render acceptance boundary in [component-fidelity.md](component-fidelity.md); “recognizable” is not permission to simplify visible internal parts or layering.

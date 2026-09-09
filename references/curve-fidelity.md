@@ -31,7 +31,7 @@ When the input is raster-only, coordinate extraction recovers visible geometry, 
    - `lower_envelope` for a downward filled profile;
    - direct native path extraction when vector source is available.
 4. Store dense source-relative coordinates in a trace JSON. Keep geometry unsmoothed; limited smoothing may be used only to detect peaks for QA.
-5. Fill short segmentation gaps by interpolation. A long gap, merged series, or ambiguous overlap requires targeted inspection or manual correction.
+5. Interpolate only bounded interior gaps. The extractor requires observed crop endpoints, column coverage of at least 0.90, and a longest gap no greater than 0.05 of crop width by default. Set `--min-column-coverage` and `--max-gap-fraction` from source quality before extraction; do not relax them to obtain a passing output. Failed evidence produces `status: fail`, empty points, and a nonzero CLI exit, not a fabricated complete curve. Inspect merged series or ambiguous overlaps separately.
 6. If points are simplified or fitted to Bézier segments, use an explicit maximum deviation and preserve every declared landmark. Fewer nodes are an editing benefit only after fidelity passes.
 
 The local extractor supports color-guided raster profiles:
@@ -42,7 +42,7 @@ python scripts/extract-curve-trace.py source.png traces/ridge-01.json \
   --mode upper_envelope
 ```
 
-Repeat `--color` for a gradient or antialiased palette. Inspect the reported column coverage and longest missing run. If color segmentation is unreliable, trace the isolated curve manually rather than broadening tolerance until unrelated marks merge.
+Repeat `--color` for a gradient or antialiased palette. Trace schema 2 records the source SHA-256, crop, mode, baseline normalized to crop height, threshold values, coverage and interpolated column indices. Coordinates retain crop-relative amplitude; each ridge is not independently rescaled to a unit peak. Use the same crop/baseline frame in the builder. For downward profiles specify the baseline explicitly, usually `--baseline-y 0`. Failed traces cannot be consumed by the auditor. Schema 1 remains readable as legacy peak-normalized evidence and cannot establish absolute amplitude fidelity. If segmentation merges unrelated marks, isolate the series or record manual coordinates with uncertainty.
 
 ## Manifest contract
 
@@ -93,13 +93,17 @@ Run:
 python scripts/audit-curve-fidelity.py visual-manifest.json output.pptx --fail-on-risk
 ```
 
-The current auditor reads native DrawingML custom geometry from the delivered PPTX, converts a filled path to its upper profile, and compares it with the source trace. It checks:
+The auditor identifies each actual object by slide part and shape ID, then selects its native component path. Names are selectors, not identity keys. It applies shape flips and axis-aligned nested-group transforms before comparing every matched instance. It checks:
 
 - exactly the declared number of output curve objects;
-- no output object assigned to multiple series;
+- no selected output path assigned to multiple series;
 - x-aligned normalized mean absolute error;
 - prominent peak count;
 - peak x-position tolerance.
+
+Optional series fields are `output_path_index` (zero-based, required for a multi-path object), `coordinate_frame` (`shape` by default or `slide_bbox`), `output_bbox` (slide inches `[x,y,width,height]`, required for `slide_bbox`), and `profile_mode` (`upper_envelope`, `lower_envelope`, or `centerline`). `expected_output_count` counts objects before component selection. The default frame compares intrinsic shape geometry, not absolute slide placement; use an explicit slide frame to check placement and scale. Different source traces require separate series declarations.
+
+Nonzero rotation, unsupported path commands, multiple contours, ambiguous envelopes and incomplete group transforms are reported as unverified failures for required series. Open paths must be single-valued and cover the declared x frame. Cubic and quadratic segments are sampled at 16 subdivisions, followed by a 201-point comparison grid: this is a bounded profile diagnostic, not an exact continuous-path or microscopic-oscillation certificate.
 
 This numeric audit is a hard gate for declared series. It complements rendered source-versus-output crops, which remain necessary for shoulders, fine oscillations, stroke weight, fill, overlap, and optical quality. The auditor currently targets single-valued x-aligned profiles; closed loops, self-crossing paths, polar curves, and arbitrary 2-D contours require explicit landmark constraints and visual review until a matching geometry audit is declared.
 

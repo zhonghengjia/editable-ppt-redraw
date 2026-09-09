@@ -62,6 +62,20 @@ class NativeToolkitTests(unittest.TestCase):
         result = normalize_path_commands(svg_path_to_absolute(parse_svg_path('M10 10 L20 20 Z Q13 10 16 10')))
         self.assertEqual(result[-1].args, [12, 10, 14, 10, 16, 10])
 
+    def test_source_mapping_resolves_after_reopen(self):
+        source = self.svg('<path id="tube" d="M1 1L5 5"/><circle id="end" cx="5" cy="5" r="2"/>')
+        result = add_svg_component(self.slide, source, 1, 1, 2, 2, name='instrument')
+        saved = self.save()
+        reopened = Presentation(saved)
+        group = next(s for s in reopened.slides[0].shapes if s.shape_id == result['group_id'])
+        actual = {s.shape_id: s for s in group.shapes}
+        self.assertEqual(len(result['element_map']), 2)
+        for entry in result['element_map']:
+            shape = actual[entry['shape_id']]
+            self.assertEqual(shape.name, entry['output_name'])
+            for measured, recorded in zip((shape.left, shape.top, shape.width, shape.height), entry['bounds_inches']):
+                self.assertAlmostEqual(measured / 914400, recorded, places=5)
+
     def test_all_curve_commands_and_arc_degeneracies(self):
         result = normalize_path_commands(svg_path_to_absolute(parse_svg_path('m1 1 c1 0 1 1 2 1 s1 1 2 1 q1 1 2 2 t2 1 a2 3 20 0 1 2 3 z')))
         self.assertTrue(all(c.cmd in 'MLCZ' for c in result))

@@ -1,7 +1,7 @@
 # Editable Visual to PowerPoint
 
 > Codex skill name: **editable-ppt-redraw**
-> 中文触发词：**图片转ppt skill**、**绘图skill**
+> 中文触发词：**图片转ppt skill**（避免与其他“绘图skill”混淆）
 
 editable-ppt-redraw reconstructs reference images, screenshots, PDF pages, and existing visual files as maintainable editable artifacts. PowerPoint is the default output, while SVG, draw.io, Excalidraw, Mermaid/Graphviz, and self-contained HTML are also supported when they better fit the editing workflow.
 
@@ -55,7 +55,13 @@ Use $editable-ppt-redraw to reconstruct this published figure as an editable PPT
 
 ## Quality gates
 
-The repository includes deterministic validators for:
+Version 3.4.0 combines curve, text, typography, endpoint, host-surface and label-clearance checks with source-frozen visible-support extraction and structural diagnostics. The [text-fidelity contract](references/text-fidelity.md) checks actual native shafts, tips and adjacent text separately from content and font ratios. [Component fidelity](references/component-fidelity.md) separates color mismatch from missing/extra support, bidirectional pixel-boundary distance and component/hole counts; its selector mode reuses pinned ImageTracerJS without filling holes or deleting fragments. Existing color limits remain mandatory. Ambiguous segmentation, resource limits and unreviewed semantic grouping do not become passes. Run the applicable local checks through:
+
+~~~bash
+python scripts/run-quality-checks.py output.pptx --manifest visual-manifest.json --layout reopened.layout.json --json quality-report.json --fail-on-risk
+~~~
+
+See [the QA contract](references/quality-runner.md) for optional arguments, required evidence and limitations. No new OCR/model/server dependency is introduced. The repository includes deterministic validators for:
 
 - visual-manifest structure and coverage;
 - PowerPoint editability and flattened-image detection;

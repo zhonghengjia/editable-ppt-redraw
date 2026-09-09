@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "version": "2.5.0",
-  "review_date": "2026-09-05",
+  "version": "3.1.0",
+  "review_date": "2026-09-08",
   "components": [
     {
       "repo": "JamieJustTang/svg2pptx-skill",
@@ -18,6 +18,33 @@
         "Arc flag/radius validation",
         "Closed-subpath current-point reset"
       ],
+      "upstream_test_suite_executed": false
+    }
+    ,{
+      "repo": "jankovicsandras/imagetracerjs",
+      "tree_sha": "cb0c84a309df5e75614d3b5166cdc77a56f12a98",
+      "blob_sha": "97f6558a304ff574e176067e1ca2edfd6c06186a",
+      "source_path": "imagetracer_v1.2.6.js",
+      "source_sha256": "7d777599650c15aa8c1f0ab98d1158749ed8d8b97b417b83e5c69ea246382f40",
+      "bundled_path": "scripts/vendor/imagetracer/imagetracer.cjs",
+      "bundled_sha256": "7d777599650c15aa8c1f0ab98d1158749ed8d8b97b417b83e5c69ea246382f40",
+      "license": "Unlicense",
+      "license_path": "scripts/vendor/imagetracer/LICENSE",
+      "license_sha256": "60d2c28d19d2bdf7bbaa59829e7a595234265e8111a01ccb74d25d6c4d2d013a",
+      "modifications": ["Filename extension only; bytes unchanged"],
+      "upstream_test_suite_executed": false
+    },{
+      "repo": "mapbox/pixelmatch",
+      "tree_sha": "c6fee35afac3c52576b2cb424bd1061ab6a4bd06",
+      "blob_sha": "2752efe39c0c9dfc288f1ad13e85e2a0fab94d7f",
+      "source_path": "index.js",
+      "source_sha256": "e0b96d4203ff501f1e39f9bce6bc3569a573e8f15a187f4e899f430324f3930d",
+      "bundled_path": "scripts/vendor/pixelmatch/index.mjs",
+      "bundled_sha256": "e0b96d4203ff501f1e39f9bce6bc3569a573e8f15a187f4e899f430324f3930d",
+      "license": "ISC",
+      "license_path": "scripts/vendor/pixelmatch/LICENSE",
+      "license_sha256": "cfec0482fb785fe27e3b368a2d9e84bf7a61b275e83ec582bf288e98cd530bb0",
+      "modifications": ["Filename extension only; bytes unchanged"],
       "upstream_test_suite_executed": false
     }
   ]

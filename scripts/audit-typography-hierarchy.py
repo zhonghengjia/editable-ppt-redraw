@@ -54,24 +54,46 @@ def collect_pptx_elements(path: Path) -> tuple[list[dict[str, Any]], int]:
                 text = "".join(node.text or "" for node in shape.findall(".//a:t", NS))
                 if not name.strip() or not text.strip():
                     continue
-                sizes: list[float] = []
-                for node in shape.findall(".//a:rPr", NS) + shape.findall(".//a:defRPr", NS):
-                    raw = node.attrib.get("sz")
-                    if raw is None:
-                        continue
-                    try:
-                        value = float(raw) / 100.0
-                    except ValueError:
-                        continue
-                    if math.isfinite(value) and value > 0:
-                        sizes.append(value)
+                runs = []
+                unresolved = []
+                body = shape.find("./p:txBody", NS)
+                auto = shape.find("./p:txBody/a:bodyPr/a:normAutofit", NS)
+                scale = float(auto.get("fontScale", "100000")) / 100000 if auto is not None else 1.
+                for paragraph in shape.findall("./p:txBody/a:p", NS):
+                    defaults = paragraph.find("./a:pPr/a:defRPr", NS)
+                    ppr = paragraph.find("./a:pPr", NS)
+                    level = int(ppr.get("lvl", "0")) + 1 if ppr is not None else 1
+                    level_defaults = body.find(f"./a:lstStyle/a:lvl{level}pPr/a:defRPr", NS) if body is not None else None
+                    for run in list(paragraph):
+                        if run.tag.rsplit("}", 1)[-1] not in ("r", "fld"):
+                            continue
+                        run_text = "".join(t.text or "" for t in run.findall("./a:t", NS))
+                        if not run_text.strip():
+                            continue
+                        props = run.find("./a:rPr", NS)
+                        attributes = {}
+                        for candidate in (level_defaults, defaults, props):
+                            if candidate is not None:
+                                attributes.update(candidate.attrib)
+                        try:
+                            size = float(attributes.get("sz", "nan")) / 100. * scale
+                            baseline = float(attributes.get("baseline", "0"))
+                        except ValueError:
+                            size, baseline = float("nan"), 0.
+                        if not math.isfinite(size) or size <= 0 or not math.isfinite(baseline):
+                            unresolved.append(run_text)
+                        else:
+                            runs.append({"text": run_text, "fontSize": size, "baseline": baseline})
+                sizes = [run["fontSize"] for run in runs]
+                normal_sizes = [run["fontSize"] for run in runs if run["baseline"] == 0]
                 element: dict[str, Any] = {
-                    "name": name,
-                    "text": text,
-                    "slideNumber": slide_number,
+                    "name": name, "text": text, "slideNumber": slide_number,
+                    "shapeId": properties.get("id") if properties is not None else None,
+                    "runs": runs, "unresolvedRuns": unresolved,
+                    "runEvidenceComplete": not unresolved,
                 }
                 if sizes:
-                    element["resolvedFontSize"] = float(statistics.median(sizes))
+                    element["resolvedFontSize"] = float(statistics.median(normal_sizes or sizes))
                     element["resolvedFontSizes"] = sizes
                 elements.append(element)
     return elements, len(slide_parts)
@@ -140,6 +162,8 @@ def audit_typography(
 
     assignments: dict[str, list[tuple[str, float]]] = {role: [] for role in roles}
     matched_text_names: set[str] = set()
+    unverified = []
+    run_reports = []
     for element in elements:
         name = element.get("name")
         text = element.get("text")
@@ -158,6 +182,42 @@ def audit_typography(
         if size is None:
             issues.append(f"text object {name!r} in role {role!r} has no resolved font size")
             continue
+        role_spec = roles[role]
+        runs = element.get("runs")
+        if not isinstance(runs, list):
+            sizes = element.get("resolvedFontSizes")
+            runs = [{"text": "", "fontSize": v, "baseline": 0} for v in sizes] if isinstance(sizes, list) else []
+        if not runs or element.get("runEvidenceComplete") is False or element.get("unresolvedRuns"):
+            unverified.append(f"{name}: per-run size evidence incomplete; inherited fonts require resolved layout")
+        normal = []
+        exceptions_used = []
+        for run in runs:
+            value = run.get("fontSize")
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or value <= 0:
+                issues.append(f"{name}: invalid run size")
+                continue
+            ratio = value / size
+            if role_spec.get("allow_script_runs", True) and run.get("baseline", 0) != 0 and value <= size:
+                exceptions_used.append({"text": run.get("text"), "reason": "scientific superscript/subscript"})
+                continue
+            exempt = False
+            for exception in role_spec.get("run_exceptions", []):
+                try:
+                    if exception.get("reason", "").strip() and re.fullmatch(exception["text_regex"], run.get("text", "")) and exception["min_size_ratio"] <= ratio <= exception["max_size_ratio"]:
+                        exempt = True
+                        exceptions_used.append({"text": run.get("text"), "reason": exception["reason"]})
+                        break
+                except (KeyError, TypeError, re.error):
+                    issues.append(f"{name}: malformed run exception")
+            if not exempt:
+                normal.append(value)
+        allowed = role_spec.get("max_intra_object_run_spread", hierarchy.get("default_max_intra_object_run_spread", .5))
+        spread = (max(normal) - min(normal)) / size if normal else 0.
+        if not isinstance(allowed, (int, float)) or isinstance(allowed, bool) or not math.isfinite(allowed) or allowed < 0:
+            issues.append(f"{name}: invalid intra-object spread limit")
+        elif spread > allowed + 1e-9:
+            issues.append(f"text object {name!r} has unexplained intra-object run spread {spread:.3f}; allowed {allowed:.3f}")
+        run_reports.append({"name": name, "run_count": len(runs), "spread": spread, "exceptions": exceptions_used})
         assignments[role].append((name, size))
         matched_text_names.add(name)
 
@@ -254,6 +314,9 @@ def audit_typography(
         "issues": issues,
         "warnings": warnings,
         "roles": role_reports,
+        "run_reports": run_reports,
+        "unverified": unverified,
+        "status": "FAIL" if issues else ("NOT_VERIFIED" if unverified else "PASS"),
         "stats": stats,
     }
 
@@ -324,7 +387,7 @@ def main() -> int:
         print(f"ISSUE: {message}")
     for message in report["warnings"]:
         print(f"WARNING: {message}")
-    if args.fail_on_risk and report["issues"]:
+    if args.fail_on_risk and (report["issues"] or report.get("unverified")):
         return 1
     return 0
 

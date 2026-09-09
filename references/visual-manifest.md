@@ -11,6 +11,8 @@ Use a visual manifest for dense, multi-panel, batch, or multi-output reconstruct
 
 ## Minimal schema
 
+For faithful source-specific shapes, `fidelity_sensitive`/`regional_fidelity` and `surface_detail`/`surface_relations` are defined solely in [component-fidelity.md](component-fidelity.md). These contracts use decoded source pixels, not manifest canvas coordinates. Declare observed ownership and source landmarks before building; regional pixel checks and native relationship checks have separate acceptance scopes.
+
 Save JSON with this structure:
 
 ```json
@@ -142,7 +144,11 @@ Save JSON with this structure:
     "edge_roles": {
       "assessment-to-stable": {
         "role": "stable_branch",
-        "output_name_regex": "^flow-assessment-to-stable-"
+        "output_name_regex": "^flow-assessment-to-stable-",
+        "endpoint_binding": {
+          "source_output_name": "assessment-box",
+          "target_output_name": "stable-box"
+        }
       }
     }
   },
@@ -186,7 +192,9 @@ Save JSON with this structure:
 }
 ```
 
-`bbox` uses `[left, top, width, height]` in the manifest canvas coordinate system.
+`bbox` uses `[left, top, width, height]` in the manifest canvas coordinate system. Source inventory text selectors/counts are defined in [text-fidelity.md](text-fidelity.md); directed endpoint evidence in [diagram-grammar.md](diagram-grammar.md); run exceptions in [typography-hierarchy.md](typography-hierarchy.md); actual curve identity and output coordinate frames in [curve-fidelity.md](curve-fidelity.md). These optional fields extend manifest schema 1. Do not duplicate their definitions in parallel configuration files.
+
+The optional `text_clearance` contract is defined solely in [text-fidelity.md](text-fidelity.md). Dense text-bearing PPTX needs it for complete automated clearance evidence; keep label/obstacle selections and gap in that one contract, not duplicated rule lists.
 
 ## Required planning content
 
@@ -207,7 +215,7 @@ Save JSON with this structure:
 
 `source_inventory[].representation` is one of `native_primitive`, `native_composite`, `source_crop`, or `evidence_raster`. A `source_crop` or `evidence_raster` item must reference a declared raster exception. Constraints use stable subject IDs and must state both the rule and how it will be verified. Positive semantic constraints use `must_connect`, `must_contain`, `must_preserve_text`, `same_style_token`, or `custom`; negative constraints use `must_not_connect`, `must_not_overlap`, `single_stroke_owner`, or `custom`. Constraint IDs are unique across both lists. Optional fields may record `execution_profile`, `icon_signatures`, panel labels, z-order, grouping, ports, axes, tables, legends, or source crop coordinates when they change authoring decisions. Each icon signature should identify its owning module, object class, non-empty required-feature list, and optional source crop. These fields extend schema version 1 and do not require a version bump.
 
-`diagram_grammar.visual_type` names the source representation family. `preserve_visual_type` and `allow_representation_change` are booleans; when a representation change is allowed, `authorization` must contain the user's explicit instruction. `routing` is one of `orthogonal`, `direct`, `curved`, `mixed`, or `source_defined`. Each `node_roles` key references a module or source-inventory ID and declares a non-empty semantic `role`, one or more `allowed_geometries`, and the exact `output_names` that must carry that role in reopened layout inspection. Every connected module endpoint must have a node-role entry. Each `edge_roles` key references a connection ID and declares a semantic `role` plus an `output_name_regex` that must match one or more editable line objects. Every connection must have an edge-role entry. See [diagram-grammar.md](diagram-grammar.md) for the decision boundary and examples.
+`diagram_grammar.visual_type` names the source representation family. `preserve_visual_type` and `allow_representation_change` are booleans; when a representation change is allowed, `authorization` must contain the user's explicit instruction. `routing` is one of `orthogonal`, `direct`, `curved`, `mixed`, or `source_defined`. Each `node_roles` key references a module or source-inventory ID and declares a non-empty semantic `role`, one or more `allowed_geometries`, and the exact `output_names` that must carry that role in reopened layout inspection. Every connected module endpoint must have a node-role entry. Each `edge_roles` key references a connection ID and declares a semantic `role` plus an `output_name_regex` that must match one or more editable line objects. Every connection must have an edge-role entry. Names establish selection only, not endpoint truth; follow the endpoint-binding contract in [diagram-grammar.md](diagram-grammar.md).
 
 `typography_hierarchy` records relative font size instead of isolated absolute sizes. `basis` is `source_observed`, `source_estimated`, `user_specified`, or `redesign_system`; `measurement` is currently `resolved_font_size`. `baseline_role` must exist in `roles` and have `target_ratio: 1.0`. Each role declares a positive ratio and a regex matching the canonical output object names. Optional `tolerance`, `required`, and `max_intra_role_spread` override the hierarchy defaults. See [typography-hierarchy.md](typography-hierarchy.md) before assigning ratios.
 
@@ -262,4 +270,4 @@ Run:
 python scripts/validate-visual-manifest.py manifest.json --fail-on-warning
 ```
 
-The validator checks structure, supported modes, optional execution profile, targets, positive canvas dimensions, unique IDs, valid bounding boxes, source-inventory coverage requirements, representation strategies, connection references, diagram-grammar completeness and authorization, typography-role contract validity, curve-contract validity, icon-signature completeness, raster references, and constraint subjects. It does not prove rendered grammar compliance, typography compliance, curve compliance, visual fidelity, semantic truth, or icon recognizability; run `scripts/audit-diagram-grammar.py`, `scripts/audit-typography-hierarchy.py`, and `scripts/audit-curve-fidelity.py` when their contracts are declared, then retain rendered comparison.
+The validator checks structure, supported modes, optional execution profile, targets, positive canvas dimensions, unique IDs, valid bounding boxes, source-inventory coverage requirements, representation strategies, connection references, diagram-grammar completeness and authorization, typography-role contract validity, curve-contract validity, icon-signature completeness, raster references, and constraint subjects. It does not execute arbitrary semantic/negative constraints or prove visual fidelity, semantic truth, icon recognizability, grammar, typography or curve compliance. Run [the applicable-check runner](quality-runner.md) on the actual artifact, then complete each declared manual/render constraint.

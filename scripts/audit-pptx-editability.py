@@ -86,6 +86,53 @@ def normalize_match_text(value: str) -> str:
     return re.sub(r"\s+", "", unicodedata.normalize("NFC", value or ""))
 
 
+def text_occurrences(required: str, actual: str) -> int:
+    value = normalize_match_text(required)
+    if not value:
+        return 0
+    left = r"(?<![A-Za-z0-9_])" if value[0].isascii() and value[0].isalnum() else ""
+    right = r"(?![A-Za-z0-9_])" if value[-1].isascii() and value[-1].isalnum() else ""
+    if value[-1].isdigit():
+        right += r"(?![.,][0-9])"
+    # Preserve token boundaries in the actual text; removing all spaces would
+    # turn 'cohort N=55' into 'cohortN=55' and incorrectly hide a real match.
+    pattern = r"\s*".join(re.escape(char) for char in value)
+    return len(re.findall(left + pattern + right, unicodedata.normalize("NFC", actual or "")))
+
+
+def text_objects(archive, slide_parts):
+    result = []
+    for number, part in enumerate(slide_parts, 1):
+        root = ET.fromstring(archive.read(part))
+        for shape in root.findall(".//p:sp", NS) + root.findall(".//p:graphicFrame", NS):
+            properties = shape.find("./p:nvSpPr/p:cNvPr", NS)
+            if properties is None:
+                properties = shape.find("./p:nvGraphicFramePr/p:cNvPr", NS)
+            result.append({
+                "slide": number, "id": properties.get("id") if properties is not None else None,
+                "name": properties.get("name") if properties is not None else None,
+                "text": "\n".join("".join(n.text or "" for n in p.findall(".//a:t", NS)) for p in shape.findall(".//a:p", NS)),
+            })
+    return result
+
+
+def audit_text_inventory(inventory, objects):
+    reports = []
+    for index, item in enumerate(inventory or []):
+        if not isinstance(item, dict) or not isinstance(item.get("text"), str) or not item["text"].strip():
+            continue
+        matches = [obj for obj in objects if
+                   ("output_slide" not in item or obj["slide"] == item["output_slide"]) and
+                   ("output_name" not in item or obj["name"] == item["output_name"]) and
+                   ("output_id" not in item or obj["id"] == str(item["output_id"]))]
+        observed = sum(text_occurrences(item["text"], obj["text"]) for obj in matches)
+        expected = item.get("required_count", 1)
+        valid_count = isinstance(expected, int) and not isinstance(expected, bool) and expected > 0
+        reports.append({"id": item.get("id", index), "text": item["text"], "observed": observed,
+                        "required_count": expected, "valid": valid_count and observed >= expected})
+    return reports
+
+
 def required_texts_from_manifest(path: Path | None) -> list[str]:
     if path is None:
         return []
@@ -645,6 +692,7 @@ def audit_pptx(
     picture_area_threshold: float,
     required_texts: list[str] | None = None,
     bounds_tolerance_emu: int = 12700,
+    source_inventory: list[dict] | None = None,
 ) -> dict[str, object]:
     with zipfile.ZipFile(path) as archive:
         slide_parts, slide_size = slide_parts_in_order(archive)
@@ -660,14 +708,16 @@ def audit_pptx(
             for index, slide_part in enumerate(slide_parts, start=1)
         ]
         package_findings = package_integrity_findings(archive)
+        objects = text_objects(archive, slide_parts)
 
     required_texts = unique_texts(required_texts)
-    deck_text = normalize_match_text("\n".join(str(slide["text"]) for slide in slides))
     missing_required_texts = [
-        value for value in required_texts if normalize_match_text(value) not in deck_text
+        value for value in required_texts if not any(text_occurrences(value, obj["text"]) for obj in objects)
     ]
 
+    inventory_report = audit_text_inventory(source_inventory, objects)
     totals = {
+        "missing_inventory_items": sum(not item["valid"] for item in inventory_report),
         "slides": len(slides),
         "native_objects": sum(int(slide["native_object_count"]) for slide in slides),
         "text_shapes": sum(int(slide["text_shape_count"]) for slide in slides),
@@ -707,6 +757,7 @@ def audit_pptx(
         + int(totals["placeholder_texts"])
         + int(totals["mojibake_texts"])
         + int(totals["missing_required_texts"])
+        + int(totals["missing_inventory_items"])
         + int(totals["zero_byte_media"])
         + int(totals["external_resources"])
         + int(totals["broken_internal_resources"])
@@ -720,6 +771,7 @@ def audit_pptx(
         "totals": totals,
         "slides": slides,
         "content_integrity": {
+            "inventory": inventory_report,
             "required_texts": required_texts,
             "missing_required_texts": missing_required_texts,
         },
@@ -827,6 +879,7 @@ def main() -> int:
             args.pptx,
             args.picture_area_threshold,
             required_texts=[*manifest_texts, *args.require_text],
+            source_inventory=json.loads(args.manifest.read_text(encoding="utf-8")).get("source_inventory", []) if args.manifest else [],
             bounds_tolerance_emu=args.bounds_tolerance_emu,
         )
     except (zipfile.BadZipFile, KeyError, ET.ParseError, OSError, ValueError, json.JSONDecodeError) as exc:

@@ -2,7 +2,7 @@
 name: editable-ppt-redraw
 description: Reconstruct uploaded or local reference visuals as maintainable editable artifacts. Use for image, screenshot, PDF-page, or existing-file conversion into native PowerPoint, SVG, draw.io, Excalidraw, Mermaid/Graphviz, or self-contained HTML; faithful diagram replication; mechanism or graphical-abstract rebuilding; and visual QA. Also match Chinese requests such as 图片转ppt skill, 图转可编辑 PPT, 参考图转可编辑矢量图, and 图片转 draw.io. Keep PPTX as the compatibility default when no output format is specified.
 metadata:
-  version: "2.7.0"
+  version: "3.4.0"
 ---
 
 # Editable Visual Reconstruction
@@ -43,10 +43,10 @@ Turn a reference visual into a locally produced, editable artifact while preserv
 - Preserve arrow direction, line style, legend meaning, panel labels, axes, scales, units, significance marks, and reading order.
 - Preserve the declared diagram grammar. Do not replace a process, cohort, decision, exclusion, terminator, milestone, compartment, causal node, chart mark, or other semantic role with a visually convenient but semantically different form unless the manifest records explicit user authorization for that representation change.
 - Keep text editable. Retain photographs, microscopy, radiology, maps, textures, and other evidence images as raster only when redrawing would change or misrepresent the evidence; rebuild their overlays separately.
-- For icons, pictograms, devices, or simplified scientific objects, read [references/icon-reconstruction.md](references/icon-reconstruction.md). Preserve the recognition signature rather than substituting a merely related symbol.
+- For icons, pictograms, devices, or simplified scientific objects, read [references/icon-reconstruction.md](references/icon-reconstruction.md). For faithful source-specific objects, read [references/component-fidelity.md](references/component-fidelity.md) before decomposing them: distinguish independent parts from host-attached surface details, construct shared projected geometry from source measurements, and declare landmarks and occlusion relationships. Mark meaningful silhouettes, branches, holes and narrow gaps as `structure_sensitive`; qualify a source-frozen selector and compare visible support independently of color. If color cannot separate that support, report the structure evidence as incomplete and retain independent source landmarks/manual evidence without falsely declaring the machine gate passed. Grouping, fitted control points and pixel similarity alone do not establish attachment or topology.
 - For PowerPoint diagrams with orthogonal flow, read [references/connector-geometry.md](references/connector-geometry.md).
 - For bordered cards, rounded panels, header bands, or repeated containers, read [references/container-geometry.md](references/container-geometry.md). Give each visible boundary one stroke owner and center content inside an explicit inner box.
-- For editable labels, especially mixed Chinese/Latin text, read [references/text-fidelity.md](references/text-fidelity.md). Preserve Unicode content and rendered glyph bounds, not only nominal font settings.
+- For editable labels, read [references/text-fidelity.md](references/text-fidelity.md). Reserve readable label regions before routing paths; preserve Unicode, glyph bounds and clearance from arrow shafts, tips and adjacent text. Text presence and font ratios do not establish visibility.
 - When the source contains three or more distinct text roles, read [references/typography-hierarchy.md](references/typography-hierarchy.md). Preserve source-relative font-size ratios, define one canonical token per role, and do not enlarge notes or flatten heading contrast merely to fill space.
 - When a chart, density stack, ridgeline plot, flow-cytometry histogram, signal, trajectory, or contour contains meaning-bearing curves, read [references/curve-fidelity.md](references/curve-fidelity.md). Prefer native vector paths or locally digitized source coordinates, trace every curve instance separately, and never replace observed multi-peak or irregular geometry with a convenient Gaussian, logistic, or other template.
 
@@ -61,17 +61,17 @@ Turn a reference visual into a locally produced, editable artifact while preserv
 
 ## Validate the actual output
 
-Read [references/quality-rubric.md](references/quality-rubric.md) and run the checks required by the selected execution profile, then:
+Read [references/quality-rubric.md](references/quality-rubric.md) and [references/quality-runner.md](references/quality-runner.md). Use `scripts/run-quality-checks.py` on the final file to collect profile-applicable local checks with explicit evidence status, then:
 
 1. Reopen or reparse the actual delivered file; do not validate only a pre-export preview.
 2. Render every page, slide, or canvas when a local render path exists and compare it with the source at full composition and detail level.
-3. Run the target-specific editability or source audit. Use `scripts/audit-pptx-editability.py` for PowerPoint and `scripts/audit-editable-source.py` for supported editable diagram/vector sources.
-4. When a manifest declares `diagram_grammar`, run `scripts/audit-diagram-grammar.py` against the reopened layout or editable-source inspection output. A missing role object, disallowed geometry, or unmatched semantic connection is blocking.
-5. When a manifest declares `typography_hierarchy`, run `scripts/audit-typography-hierarchy.py` against the actual PPTX package, or against reopened layout JSON for another target. Missing required roles, overlapping role assignments, flattened ratios, or unintended intra-role size drift are blocking.
-6. When a manifest declares `curve_fidelity`, run `scripts/audit-curve-fidelity.py` against the actual PPTX. A missing or duplicated series, template substitution, wrong peak count, displaced peak, or excessive source-to-output trace error is blocking.
+3. Confirm the runner executed target editability and each declared grammar, typography and curve check. A missing prerequisite, unsupported geometry or inherited font size is not a pass. For repeated text, use the scoped inventory contract; names and global text presence alone cannot prove complete panel coverage.
+4. Require actual directed endpoint evidence for semantic connections. Named line geometry and native endpoint/arrow meaning are separate checks under the grammar and connector contracts.
+5. Check source-relative font roles and individual text runs, including bounded scientific-script exceptions. Object medians or shape-level theme defaults must not hide actual run sizes. Execute the text-clearance contract against the final native file, then inspect rendered glyphs and arrowheads. Missing clearance evidence for dense text-bearing PPTX is unverified, not a typography PASS.
+6. Compare every curve object instance with its source trace. Preserve source-coordinate frames, gap provenance and transforms; do not merge same-name objects, validate only the first match or interpolate across unobserved long gaps. Unsupported or ambiguous curves remain incomplete until verified through an appropriate source-grounded route.
 7. For PowerPoint connections, follow [references/connector-geometry.md](references/connector-geometry.md): inspect native endpoint bindings and semantic arrow direction in the actual PPTX, and run the orthogonal segment audit on reopened layout JSON where explicitly routed segments are present. Never count unverified grouped or arbitrary-shape geometry as passed.
 8. For raster icon or evidence assets, run `scripts/audit-raster-asset-integrity.py`; edge contact, clipped visible bounds, implausible occupancy, or unreadable files block use of that asset.
-9. For compact symbols or dense modules, generate source-versus-output crops with `scripts/build-comparison-contact-sheet.py` and verify recognizability without adjacent labels.
+9. For compact symbols or dense modules, generate source-versus-output crops with `scripts/build-comparison-contact-sheet.py`. Apply the mode-specific recognition and component-fidelity contracts. In faithful work, verify each host/detail relationship using actual native readback plus the complete and magnified final render. Inspect surface attachment independently of regional pixel metrics; missing relationship evidence cannot inherit a regional PASS. Use source measurements, not authored coordinates compared to themselves.
 10. Correct clipping, overflow, unexpected wrapping, typography-ratio or curve-fidelity violations, overlaps, duplicate borders, broken connectors, wrong z-order, missing required text, mojibake, unapproved raster substitution, external-resource leakage, unresolved placeholders, and diagram-grammar violations.
 
 Use one complete construction pass followed by at most one evidence-driven correction pass. Fix the canonical source and regenerate rather than patching the exported derivative. After the correction pass, a remaining blocking defect means the task is incomplete and must be reported as such; disclose non-blocking residual differences and stop instead of entering an open-ended cosmetic loop.

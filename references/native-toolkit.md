@@ -2,7 +2,7 @@
 
 Use these helpers inside an existing local python-pptx builder for reusable vector components and aligned rectangular connections. Dependencies: python-pptx, lxml (its dependency) and Pillow. Probe imports once in the selected runtime. No networking, model download, service, plugin or environment change is performed.
 
-This component toolkit does not recognize raster images or render arbitrary SVG. PNG/JPG still needs source inspection and semantic rebuilding. Keep text in native text boxes, process/decision nodes in appropriate AutoShapes, and scientific values in the canonical source. Never outline text to force it through this SVG profile.
+This native importer does not recognize raster images or render arbitrary SVG. For selected raster components, the optional local tracing adapter in [component-fidelity.md](component-fidelity.md) supplies source-derived SVG; source inspection, semantic part separation and final-render comparison remain necessary. Keep text in native text boxes, process/decision nodes in appropriate AutoShapes, and scientific values in the canonical source. Never outline text to force it through this SVG profile.
 
 ## SVG profile
 
@@ -20,8 +20,10 @@ from native_vectors import add_svg_component, add_rect_link
 result = add_svg_component(slide, project_directory / 'instrument.svg',
                            x=1.2, y=2.0, width=.6, height=.6,
                            name='instrument-assessment', color='#173D6A')
-# Record result['source_sha256'] and result['source_ids']; result['group'] is native.
+# Record result['source_sha256'] and result['element_map']; result['group'] is native.
 ```
+
+`element_map` records each accepted source primitive ID, actual output shape ID/name and initial bounds in inches. `group_id` and `slide_part` scope the mapping. Reopen the saved PPTX and resolve those IDs; after further transformations remeasure the actual bounds instead of treating initial placement as final evidence. The existing duplicate-source-ID rejection remains unchanged.
 
 Coordinates are inches. Select a source/bundled asset only when its recognition signature fits. `assets/lucide/inventory.json` is the asset provenance authority; this starter pack is not an exhaustive medical library.
 

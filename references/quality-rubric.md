@@ -1,6 +1,6 @@
 # Quality and delivery rubric
 
-Use this rubric on the actual delivered artifact. Content fidelity, visual fidelity, and editability are independent requirements; none can substitute for another.
+Use this rubric on the actual delivered artifact. Content fidelity, visual fidelity, and editability are independent requirements; none can substitute for another. Use [quality-runner.md](quality-runner.md) for the common local audit entrypoint, status meanings, applicability and evidence provenance.
 
 ## Content fidelity
 
@@ -20,7 +20,7 @@ For a manifest-backed structured visual, run:
 python scripts/audit-diagram-grammar.py visual-manifest.json reopened.layout.json --fail-on-risk
 ```
 
-The audit verifies declared role objects, allowed geometries, and named semantic connections in the actual reopened output. It complements rather than replaces visual review and connector routing audits.
+The audit verifies role objects and allowed geometry, and separately reports directed endpoint evidence according to [diagram-grammar.md](diagram-grammar.md). A correctly named line is not proof of a semantic connection. Missing evidence is `NOT_VERIFIED`; visual review and connector routing audits remain separate.
 
 ## Typography-hierarchy fidelity
 
@@ -32,7 +32,7 @@ For a manifest that declares `typography_hierarchy`, run:
 python scripts/audit-typography-hierarchy.py visual-manifest.json output.pptx --fail-on-risk
 ```
 
-For PowerPoint, direct OOXML inspection is authoritative for run-level font sizes; reopened layout JSON remains supported for other targets. Block delivery when a required role is missing, one object is assigned to multiple roles, a role's median resolved size falls outside its source-declared ratio range, or same-role objects drift beyond the allowed spread. The audit is numeric evidence only: render inspection remains required for glyph substitution, optical weight, wrapping, and rotated text.
+Use [typography-hierarchy.md](typography-hierarchy.md) for the authoritative run-resolution and exception contract. Check role ratios and per-run anomalies; unresolved inherited sizes cannot be certified from object medians. Numeric evidence does not replace rendered glyph, wrapping, weight and rotation review.
 
 ## Curve-coordinate fidelity
 
@@ -82,7 +82,7 @@ For icons, pictograms, compact devices, and simplified scientific objects, compa
 python scripts/build-comparison-contact-sheet.py reference.png rendered.png regions.json output.png
 ```
 
-Pass only when the defining silhouette, topology, terminals, negative spaces, component relationships, orientation, and stroke continuity agree with the selected reconstruction mode. A broadly related symbol is not an acceptable substitute in faithful reconstruction.
+Pass only when silhouette, topology, terminals, negative spaces, host/detail attachment, orientation and stroke continuity agree with the selected reconstruction mode. Faithful source-specific objects follow [component-fidelity.md](component-fidelity.md) for source measurements, relationship readback, regional evidence and rendered occlusion. Record relationship findings separately from regional metric status: a misaligned surface detail blocks component acceptance even when the pixel region passes. A broadly related symbol is not an acceptable substitute.
 
 For transparent or extracted raster assets, run:
 
@@ -96,7 +96,7 @@ Treat visible alpha pixels entering the edge-risk band, implausibly tight visibl
 
 Block delivery for unintended overlap, clipping, overflow, broken connectors, incorrect z-order, unresolved placeholders, objects outside the canvas, or compact symbols whose defining parts collapse, disconnect, merge, or become ambiguous at delivered size.
 
-- Check unexpected text wrapping, especially labels and headings intended to remain on one line.
+- Execute [text clearance](text-fidelity.md) on actual label boxes, arrow shafts and arrowheads, then inspect actual glyphs. A text-presence or typography PASS cannot waive a covered label. Check unexpected wrapping, especially labels and headings intended to remain on one line.
 - Compare text-role proportions, not only individual sizes. Small source notes must remain subordinate; headings must not collapse to body scale; role tokens should be consistent across panels.
 - Enforce one stroke owner per visible container boundary. Header bands, masks, overlays, and inner backgrounds must not create a second same-bounds outline.
 - Center inner content against the measured interior box after subtracting borders, padding, title bands, and reserved icon regions; do not center it against the outer panel by eye.
@@ -104,7 +104,7 @@ Block delivery for unintended overlap, clipping, overflow, broken connectors, in
 - Verify the `diagram_grammar` contract, including its visual type, authorization state, node-role geometries, edge-role matches, and routing convention.
 - Inspect every page, slide, panel, or canvas individually; a montage alone is insufficient.
 - For PowerPoint diagrams expected to use orthogonal routing, reopen the PPTX, export layout JSON, and run `scripts/audit-orthogonal-flow-lines.py <layout-json-or-dir> --require-matches --fail-on-risk`.
-- For draw.io, confirm unique cell IDs, native vertices and edges, and `mxGeometry relative="1"` on edges.
+- For draw.io, confirm model-scoped unique IDs and valid native/free edge endpoints under [output-formats.md](output-formats.md).
 - For SVG and HTML, check the viewBox or viewport, text clipping, external assets, and overflow in a local renderer.
 - For Excalidraw, verify scene parsing, bound labels, arrow relationships, and image-element exceptions.
 - For Mermaid and Graphviz, verify the source parses and the rendered derivative preserves node and edge semantics.

@@ -13,7 +13,7 @@ Required work:
 - record the canvas, principal objects, reading order, and uncertainties in working notes;
 - build from one canonical editable source;
 - reopen or reparse the delivered artifact;
-- run the target-specific editability or source audit;
+- run the target-specific editability or source audit through [the local quality runner](quality-runner.md), without adding an unnecessary manifest;
 - render the complete output when a local render path exists and inspect composition, clipping, and text wrapping;
 - run connector or icon checks only when those features are present.
 
@@ -75,7 +75,7 @@ Record the selected backend, version when readily available, failed probe if any
 Use exactly one canonical builder, source document, or manifest-backed source model.
 
 1. Complete one coherent construction pass.
-2. Reopen or reparse the actual output and collect the checks required by the selected profile.
+2. Reopen or reparse the actual output and collect the checks required by the selected profile using [quality-runner.md](quality-runner.md). Missing evidence remains unverified; manual render checks remain separate from automatic results.
 3. If evidence shows defects, make one targeted correction pass in the canonical source and regenerate all affected outputs.
 4. Rerun only the checks affected by the change plus the final reopen or reparse check.
 

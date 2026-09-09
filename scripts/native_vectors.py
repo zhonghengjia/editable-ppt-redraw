@@ -252,9 +252,13 @@ def add_svg_component(slide, source, x, y, width, height, *, name='vector', colo
     ox = x*96 + (width*96-vw*scale)/2 - vx*scale
     oy = y*96 + (height*96-vh*scale)/2 - vy*scale
     xml_parts = []
+    element_map = []
     next_id = max(int(n.get('id')) for n in slide._element.iter(f'{{{P_NS}}}cNvPr')) + 2
     for index, spec in enumerate(specs):
         inner, left, top, w, h = path_commands_to_drawingml(spec['commands'], ox, oy, scale, scale)
+        element_map.append({'source_id': spec['id'], 'shape_id': next_id + index,
+                            'output_name': name + '/' + spec['id'],
+                            'bounds_inches': [left / 96, top / 96, w / 96, h / 96]})
         def fill_xml(value, opacity):
             return '<a:noFill/>' if value is None else (
                 f'<a:solidFill><a:srgbClr val="{value}"><a:alpha val="{round(opacity*100000)}"/>'
@@ -280,7 +284,9 @@ def add_svg_component(slide, source, x, y, width, height, *, name='vector', colo
         group.shapes._spTree.append(elem)
     group.shapes._recalculate_extents()
     return {'group': group, 'source_sha256': digest, 'paths': len(specs),
-            'source_ids': [spec['id'] for spec in specs], 'raster_count': 0}
+            'source_ids': [spec['id'] for spec in specs], 'raster_count': 0,
+            'element_map': element_map, 'group_id': group.shape_id,
+            'slide_part': str(slide.part.partname)}
 
 
 def add_rect_link(slide, source, target, *, source_port='bottom', target_port='top',

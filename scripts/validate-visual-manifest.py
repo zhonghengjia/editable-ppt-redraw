@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import math
 import re
@@ -196,6 +197,10 @@ def validate_manifest(data: Any) -> dict[str, Any]:
                 errors.append(f"{location}: bbox extends beyond the manifest canvas")
 
     source_inventory = data.get("source_inventory", [])
+    component_spec = importlib.util.spec_from_file_location("component_fidelity", Path(__file__).with_name("component_fidelity.py"))
+    component_module = importlib.util.module_from_spec(component_spec)
+    component_spec.loader.exec_module(component_module)
+    errors.extend(component_module.validate_contract(data))
     if not isinstance(source_inventory, list):
         errors.append("source_inventory must be a list when provided")
         source_inventory = []
@@ -232,6 +237,13 @@ def validate_manifest(data: Any) -> dict[str, Any]:
             errors.append(
                 f"{location}.representation must be one of {sorted(SUPPORTED_REPRESENTATIONS)}"
             )
+        for key in ("output_slide", "required_count"):
+            value = item.get(key, 1)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                errors.append(f"{location}.{key} must be a positive integer")
+        for key in ("output_name", "output_id"):
+            if key in item and (not isinstance(item[key], str) or not item[key].strip()):
+                errors.append(f"{location}.{key} must be a non-empty string")
         if role == "text":
             text = item.get("text")
             if not isinstance(text, str) or not text.strip():
@@ -444,6 +456,20 @@ def validate_manifest(data: Any) -> dict[str, Any]:
                     if not isinstance(spec, dict):
                         errors.append(f"{location} must be an object")
                         continue
+                    binding = spec.get("endpoint_binding")
+                    if binding is not None:
+                        if not isinstance(binding, dict):
+                            errors.append(f"{location}.endpoint_binding must be an object")
+                        else:
+                            for end in ("source_output_name", "target_output_name"):
+                                if not isinstance(binding.get(end), str) or not binding[end].strip():
+                                    errors.append(f"{location}.endpoint_binding.{end} must be a non-empty string")
+                            names = binding.get("ordered_output_names")
+                            if names is not None and (not isinstance(names, list) or not names or any(not isinstance(n, str) or not n.strip() for n in names) or len(names) != len(set(str(n) for n in names))):
+                                errors.append(f"{location}.endpoint_binding.ordered_output_names must be unique non-empty strings")
+                            tol = binding.get("tolerance", .01)
+                            if isinstance(tol, bool) or not isinstance(tol, (float, int)) or not math.isfinite(tol) or tol < 0:
+                                errors.append(f"{location}.endpoint_binding.tolerance must be finite nonnegative")
                     role = spec.get("role")
                     if not isinstance(role, str) or not role.strip():
                         errors.append(f"{location}.role must be a non-empty string")
@@ -491,6 +517,9 @@ def validate_manifest(data: Any) -> dict[str, Any]:
                 ):
                     errors.append(f"typography_hierarchy.{key} must be between 0 and 0.5")
 
+            run_limit = typography_hierarchy.get("default_max_intra_object_run_spread", .5)
+            if isinstance(run_limit, bool) or not isinstance(run_limit, (float, int)) or not math.isfinite(run_limit) or run_limit < 0:
+                errors.append("typography_hierarchy.default_max_intra_object_run_spread must be finite nonnegative")
             raw_roles = typography_hierarchy.get("roles")
             if not isinstance(raw_roles, dict) or not raw_roles:
                 errors.append("typography_hierarchy.roles must be a non-empty object")
@@ -503,6 +532,28 @@ def validate_manifest(data: Any) -> dict[str, Any]:
                     if not isinstance(spec, dict):
                         errors.append(f"{location} must be an object")
                         continue
+                    limit = spec.get("max_intra_object_run_spread", .5)
+                    if isinstance(limit, bool) or not isinstance(limit, (float, int)) or not math.isfinite(limit) or limit < 0:
+                        errors.append(f"{location}.max_intra_object_run_spread must be finite nonnegative")
+                    if not isinstance(spec.get("allow_script_runs", True), bool):
+                        errors.append(f"{location}.allow_script_runs must be boolean")
+                    exceptions = spec.get("run_exceptions", [])
+                    if not isinstance(exceptions, list):
+                        errors.append(f"{location}.run_exceptions must be a list")
+                    else:
+                        for exception in exceptions:
+                            if not isinstance(exception, dict):
+                                errors.append(f"{location}.run_exceptions entries must be objects")
+                                continue
+                            try:
+                                if not isinstance(exception.get("reason"), str) or not exception["reason"].strip():
+                                    raise ValueError("nonempty reason required")
+                                re.compile(exception["text_regex"])
+                                low, high = exception["min_size_ratio"], exception["max_size_ratio"]
+                                if not is_positive_number(low) or not is_positive_number(high) or low > high:
+                                    raise ValueError("ordered positive ratio bounds required")
+                            except (ValueError, KeyError, TypeError, re.error) as exc:
+                                errors.append(f"{location}.run_exceptions: {exc}")
                     target_ratio = spec.get("target_ratio")
                     if not is_positive_number(target_ratio):
                         errors.append(f"{location}.target_ratio must be a positive number")
@@ -632,6 +683,16 @@ def validate_manifest(data: Any) -> dict[str, Any]:
                         except re.error as exc:
                             errors.append(f"{location}.output_name_regex is invalid: {exc}")
 
+                    selected = spec.get("output_path_index")
+                    if selected is not None and (isinstance(selected, bool) or not isinstance(selected, int) or selected < 0):
+                        errors.append(f"{location}.output_path_index must be a nonnegative integer")
+                    frame = spec.get("coordinate_frame", "shape")
+                    if frame not in ("shape", "slide_bbox"):
+                        errors.append(f"{location}.coordinate_frame must be shape or slide_bbox")
+                    if frame == "slide_bbox":
+                        validate_bbox(spec.get("output_bbox"), f"{location}.output_bbox", errors)
+                    if spec.get("profile_mode", "upper_envelope") not in ("upper_envelope", "lower_envelope", "centerline"):
+                        errors.append(f"{location}.profile_mode is unsupported")
                     expected_output_count = spec.get("expected_output_count", 1)
                     if (
                         not isinstance(expected_output_count, int)
@@ -782,6 +843,16 @@ def validate_manifest(data: Any) -> dict[str, Any]:
                 warnings.append(f"uncertainties[{index}] lacks a non-empty detail")
         else:
             warnings.append(f"uncertainties[{index}] should be a string or object")
+
+    surface_spec = importlib.util.spec_from_file_location('surface_relations', Path(__file__).with_name('surface_relations.py'))
+    surface_module = importlib.util.module_from_spec(surface_spec)
+    surface_spec.loader.exec_module(surface_module)
+    errors.extend(surface_module.validate_contract(data))
+
+    clearance_spec = importlib.util.spec_from_file_location('text_clearance', Path(__file__).with_name('text_clearance.py'))
+    clearance_module = importlib.util.module_from_spec(clearance_spec)
+    clearance_spec.loader.exec_module(clearance_module)
+    errors.extend(clearance_module.validate_contract(data))
 
     stats.update(
         {

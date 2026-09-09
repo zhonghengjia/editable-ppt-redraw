@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -26,6 +27,54 @@ def collect_elements(layout_documents: list[dict[str, Any]]) -> list[dict[str, A
         if isinstance(raw_elements, list):
             elements.extend(item for item in raw_elements if isinstance(item, dict))
     return elements
+
+
+def endpoint_evidence(spec, lines, by_name):
+    """Verify directed endpoint evidence; a line bbox cannot establish direction."""
+    binding = spec.get("endpoint_binding")
+    if not isinstance(binding, dict):
+        return "NOT_VERIFIED", "no declared endpoint_binding"
+    source, target = binding.get("source_output_name"), binding.get("target_output_name")
+    for name in (source, target):
+        if len(by_name.get(name, [])) != 1:
+            return "FAIL", f"endpoint {name!r} is missing or ambiguous"
+    if len(lines) == 1 and "source_name" in lines[0] and "target_name" in lines[0]:
+        valid = lines[0]["source_name"] == source and lines[0]["target_name"] == target
+        return ("PASS", "actual native endpoint bindings") if valid else ("FAIL", "native endpoints differ from declared source/target")
+    names = binding.get("ordered_output_names")
+    if not isinstance(names, list) or not names:
+        return "NOT_VERIFIED", "explicit routed lines need ordered_output_names"
+    if sorted(names) != sorted(line["name"] for line in lines):
+        return "FAIL", "ordered route does not cover matched lines exactly"
+    points = []
+    for name in names:
+        matches = by_name.get(name, [])
+        if len(matches) != 1:
+            return "FAIL", "route segment name is ambiguous"
+        ends = matches[0].get("endpoints")
+        if not isinstance(ends, list) or len(ends) != 2 or any(not isinstance(p, list) or len(p) != 2 or any(isinstance(v, bool) or not isinstance(v, (float, int)) or not math.isfinite(v) for v in p) for p in ends):
+            return "NOT_VERIFIED", "directed endpoints not available from reopened layout"
+        points.append(ends)
+    tolerance = binding.get("tolerance", .01)
+    if isinstance(tolerance, bool) or not isinstance(tolerance, (float, int)) or not math.isfinite(tolerance) or tolerance < 0:
+        return "FAIL", "invalid endpoint tolerance"
+    if any(math.dist(a[1], b[0]) > tolerance for a, b in zip(points, points[1:])):
+        return "FAIL", "directed route is discontinuous"
+    for name, point in ((source, points[0][0]), (target, points[-1][1])):
+        node = by_name[name][0]
+        box = node.get("bbox")
+        if node.get("geometry") != "rect" or not isinstance(box, list) or len(box) != 4:
+            return "NOT_VERIFIED", "coordinate endpoint validation supports explicit rectangular bboxes only"
+        if any(isinstance(v, bool) or not isinstance(v, (float, int)) or not math.isfinite(v) for v in box):
+            return "FAIL", "nonfinite node bbox"
+        x, y, w, h = box
+        px, py = point
+        on_boundary = (w > 0 and h > 0 and x-tolerance <= px <= x+w+tolerance and
+                       y-tolerance <= py <= y+h+tolerance and
+                       min(abs(px-x), abs(px-x-w), abs(py-y), abs(py-y-h)) <= tolerance)
+        if not on_boundary:
+            return "FAIL", f"directed endpoint misses {name!r} boundary"
+    return "PASS", "directed segment continuity and rectangular boundary attachment"
 
 
 def audit_grammar(
@@ -104,6 +153,9 @@ def audit_grammar(
                     )
 
     matched_edge_objects = 0
+    connection_reports = {}
+    unverified = []
+    connections = {c.get("id"): c for c in manifest.get("connections", []) if isinstance(c, dict)}
     edge_roles = grammar.get("edge_roles", {})
     if not isinstance(edge_roles, dict):
         issues.append("diagram_grammar.edge_roles must be an object")
@@ -134,6 +186,19 @@ def audit_grammar(
             )
             continue
         matched_edge_objects += len(line_matches)
+        binding = spec.get("endpoint_binding", {})
+        declared = connections.get(connection_id)
+        if isinstance(binding, dict) and declared:
+            for end in ("source", "target"):
+                role = node_roles.get(declared.get(end), {})
+                if role and binding.get(end + "_output_name") not in role.get("output_names", []):
+                    issues.append(f"edge role {connection_id!r}: {end} binding conflicts with declared node role")
+        state, reason = endpoint_evidence(spec, line_matches, elements_by_name)
+        connection_reports[connection_id] = {"status": state, "reason": reason}
+        if state == "FAIL":
+            issues.append(f"edge role {connection_id!r}: {reason}")
+        elif state == "NOT_VERIFIED":
+            unverified.append(f"edge role {connection_id!r}: {reason}")
         non_line_matches = len(named_matches) - len(line_matches)
         if non_line_matches:
             warnings.append(
@@ -149,7 +214,10 @@ def audit_grammar(
         "matched_node_objects": matched_node_objects,
         "matched_edge_objects": matched_edge_objects,
     }
-    return {"valid": not issues, "issues": issues, "warnings": warnings, "stats": stats}
+    return {"valid": not issues, "issues": issues, "warnings": warnings, "stats": stats,
+            "endpoint_evidence": connection_reports, "unverified": unverified,
+            "status": "FAIL" if issues else ("NOT_VERIFIED" if unverified else "PASS"),
+            "coverage": "Named geometry and declared directed endpoints; arrow style and obstacle avoidance require separate checks."}
 
 
 def parse_args() -> argparse.Namespace:
@@ -203,7 +271,7 @@ def main() -> int:
         print(f"ISSUE: {message}")
     for message in report["warnings"]:
         print(f"WARNING: {message}")
-    if args.fail_on_risk and report["issues"]:
+    if args.fail_on_risk and (report["issues"] or report.get("unverified")):
         return 1
     return 0
 

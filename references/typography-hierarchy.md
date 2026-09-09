@@ -27,6 +27,7 @@ Add `typography_hierarchy` to a standard or dense visual manifest when relative 
     "baseline_role": "axis_title",
     "default_tolerance": 0.12,
     "default_max_intra_role_spread": 0.10,
+    "default_max_intra_object_run_spread": 0.50,
     "roles": {
       "panel_label": {
         "target_ratio": 1.35,
@@ -55,6 +56,8 @@ Add `typography_hierarchy` to a standard or dense visual manifest when relative 
 
 `measurement` is currently `resolved_font_size`. It is a deterministic proxy for hierarchy, not proof of rendered equivalence. `baseline_role` must exist in `roles` and have `target_ratio: 1.0`. Every role requires a positive `target_ratio` and a non-empty `output_name_regex`. `tolerance` is a fractional deviation from the target ratio. `required` defaults to `true`. `max_intra_role_spread` limits unintended size drift among objects assigned to the same role.
 
+`default_max_intra_object_run_spread` limits `(largest non-exempt run - smallest non-exempt run) / representative object size`; a role may override it with `max_intra_object_run_spread`. The default 0.50 is an anomaly threshold, not a promise of source-level typographic parity. Set tighter source-supported values before building. `allow_script_runs` defaults to true and excludes baseline-shifted runs no larger than the normal body size. A large non-script label requires a bounded `run_exceptions` entry with `text_regex` (full-run match), nonempty `reason`, `min_size_ratio` and `max_size_ratio`. Exceptions must reflect the source, not hide a failed test.
+
 Keep role regexes mutually exclusive. A text object matching more than one role is a contract error because the intended hierarchy is ambiguous.
 
 ## Authoring procedure
@@ -73,7 +76,11 @@ Keep role regexes mutually exclusive. A text object matching more than one role 
 python scripts/audit-typography-hierarchy.py visual-manifest.json output.pptx --fail-on-risk
 ```
 
-The audit also accepts reopened `.layout.json` for non-PowerPoint targets. For PPTX, direct OOXML inspection is preferred because some importers replace run-level font metadata with theme defaults. The audit reports role counts, median resolved size, observed ratio, expected range, and intra-role spread. It blocks missing required roles, overlapping role regexes, absent resolved sizes, ratio violations, and excessive size drift within a role.
+The audit accepts reopened `.layout.json` for other targets. Each text element should include `runs: [{text, fontSize, baseline}]`, with baseline 0 for ordinary text, and `runEvidenceComplete`. Legacy `resolvedFontSizes` can establish spread but not script/text exceptions; a lone object median cannot establish run-level completeness.
+
+PPTX inspection resolves explicit run sizes, paragraph defaults, local list-level defaults and stored normal-autofit scale. It does not guess layout/master/theme inherited fonts. Unresolved runs are reported as `NOT_VERIFIED`, and `--fail-on-risk` returns nonzero. A resolved layout from the target renderer can supply the missing evidence. Normal-run medians remain the role-size proxy; explicit script runs do not flatten that role baseline.
+
+Reports separate role ratios/spread, per-object run spread, used exceptions and unresolved evidence. `valid` describes detected violations; use `status` and `unverified` for completeness. Missing required roles, ambiguous assignments, ratio violations and unexplained run-size drift block acceptance.
 
 ## Correction order
 

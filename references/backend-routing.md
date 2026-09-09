@@ -10,7 +10,7 @@ Use the first available route that passes a small native-object smoke test:
 2. A project-pinned native PPTX builder such as PptxGenJS, python-pptx, or an equivalent documented local library.
 3. Direct OOXML only when the required object cannot be represented safely through the installed builder and the resulting package can be reopened and rendered.
 
-The smoke test must create, save, reopen, and inspect one text box, one bordered shape, and one connector. Do not start a dense reconstruction when the selected route cannot preserve these objects.
+The smoke test must create, save, reopen, and inspect one text box, one bordered shape, and one connector. Source-specific curved/layered objects additionally require the representative-component qualification in [component-fidelity.md](component-fidelity.md). Do not start a dense reconstruction when the selected route cannot preserve its required object types.
 
 ## SVG-first route
 

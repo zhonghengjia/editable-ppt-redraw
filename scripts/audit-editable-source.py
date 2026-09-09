@@ -141,17 +141,34 @@ def audit_drawio(path: Path) -> dict[str, Any]:
         return finalize(report)
 
     cells = [node for model in graph_models for node in model.iter() if local_name(node.tag) == "mxCell"]
-    seen_ids: set[str] = set()
     duplicate_ids: set[str] = set()
+    for page, model in enumerate(graph_models, 1):
+        page_cells = [node for node in model.iter() if local_name(node.tag) == "mxCell"]
+        # draw.io IDs belong to one graph model, not to the whole document.
+        parents = {child: parent for parent in model.iter() for child in parent}
+        ids = []
+        for cell in page_cells:
+            owner = parents.get(cell)
+            cell_id = cell.get("id") or (owner.get("id") if owner is not None else None)
+            if cell_id:
+                if cell_id in ids:
+                    duplicate_ids.add(f"page {page}: {cell_id}")
+                ids.append(cell_id)
+        for cell in page_cells:
+            if cell.get("edge") != "1":
+                continue
+            geometry = next((c for c in cell if local_name(c.tag) == "mxGeometry"), None)
+            for endpoint in ("source", "target"):
+                target = cell.get(endpoint)
+                if target is not None:
+                    if target not in ids:
+                        report["errors"].append(f"page {page} edge {cell.get('id')} has dangling {endpoint}={target!r}")
+                elif geometry is None or not any(c.get("as") == endpoint + "Point" for c in geometry):
+                    report["risks"].append(f"page {page} edge {cell.get('id')} has no {endpoint} binding or free point")
     vertices = edges = image_cells = native_vertices = 0
     malformed_edges = 0
     external_images = 0
     for cell in cells:
-        cell_id = cell.attrib.get("id")
-        if cell_id:
-            if cell_id in seen_ids:
-                duplicate_ids.add(cell_id)
-            seen_ids.add(cell_id)
         is_vertex = cell.attrib.get("vertex") == "1"
         is_edge = cell.attrib.get("edge") == "1"
         style = cell.attrib.get("style", "")
@@ -209,6 +226,23 @@ def audit_excalidraw(path: Path) -> dict[str, Any]:
         return finalize(report)
 
     elements = [item for item in data["elements"] if isinstance(item, dict) and not item.get("isDeleted", False)]
+    ids = [element.get("id") for element in elements]
+    if any(not isinstance(value, str) or not value for value in ids):
+        report["errors"].append("active Excalidraw element lacks a string ID")
+    valid_ids = [value for value in ids if isinstance(value, str)]
+    if len(valid_ids) != len(set(valid_ids)):
+        report["errors"].append("duplicate active Excalidraw IDs")
+    for element in elements:
+        for key in ("startBinding", "endBinding"):
+            binding = element.get(key)
+            if binding is not None and (not isinstance(binding, dict) or binding.get("elementId") not in valid_ids):
+                report["errors"].append(f"{element.get('id')}: dangling or malformed {key}")
+        for key in ("containerId", "frameId"):
+            if element.get(key) is not None and element[key] not in valid_ids:
+                report["errors"].append(f"{element.get('id')}: dangling {key}")
+        bound = element.get("boundElements") or []
+        if not isinstance(bound, list) or any(not isinstance(b, dict) or b.get("id") not in valid_ids for b in bound):
+            report["errors"].append(f"{element.get('id')}: dangling or malformed boundElements")
     type_counts: dict[str, int] = {}
     for element in elements:
         element_type = str(element.get("type", "unknown"))
