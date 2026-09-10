@@ -48,7 +48,7 @@ The audit reads native DrawingML custom geometry from the delivered PPTX, not on
 
 ## Native editability
 
-Pass when ordinary text and redrawable components use the selected format's native editable representation, major logical modules can be selected or changed separately, and the source was not used as a flattened whole-composition substitute.
+Pass when required native roles use native objects, major logical modules can be selected or changed separately, and the source was not used as a flattened whole-composition substitute. An approved hybrid component has object-level move/scale/replace editability, not internally editable pixels or paths; follow [hybrid-components.md](hybrid-components.md). A mixed slide is not fully native merely because its text is editable.
 
 Use the applicable audit:
 
@@ -72,7 +72,7 @@ For faithful and semantic reconstruction, render the actual output and run `scri
 
 - Inspect overlay and difference images at full-composition and detail level.
 - Prioritize foreground and edge differences over empty-background similarity.
-- Use similarity metrics as diagnostics, not universal pass thresholds.
+- Use similarity metrics as diagnostics, not universal pass thresholds. Apply [appearance-fidelity.md](appearance-fidelity.md) for source-bound semantic color, tone, contour, occlusion and transparency requirements. Flatness or a brighter foreground is not itself a defect; lost source distinctions or invented depth can be. Numeric probes and native paint order cannot override a failed or missing scoped visual finding.
 - A high similarity score is invalid evidence when the editability audit shows a flattened artifact.
 - In redesign mode, verify retained content, relationships, and hierarchy; pixel similarity is not the goal.
 
@@ -82,7 +82,7 @@ For icons, pictograms, compact devices, and simplified scientific objects, compa
 python scripts/build-comparison-contact-sheet.py reference.png rendered.png regions.json output.png
 ```
 
-Pass only when silhouette, topology, terminals, negative spaces, host/detail attachment, orientation and stroke continuity agree with the selected reconstruction mode. Faithful source-specific objects follow [component-fidelity.md](component-fidelity.md) for source measurements, relationship readback, regional evidence and rendered occlusion. Record relationship findings separately from regional metric status: a misaligned surface detail blocks component acceptance even when the pixel region passes. A broadly related symbol is not an acceptable substitute.
+Pass only when silhouette, topology, terminals, negative spaces, host/detail attachment, orientation and stroke continuity agree with the selected reconstruction mode. Faithful source-specific objects follow [component-fidelity.md](component-fidelity.md) for source measurements, joint assembly coverage, relationship readback, regional evidence and rendered occlusion. Review the complete visible assembly as well as its parts: correctly colored individual objects may still leave background leaks at contacts. New holes and filled real holes are separate failures; equal hole counts or gap-free preparation do not prove final native rendering or correct ownership. Record relationship findings separately from regional metric status: a misaligned surface detail blocks component acceptance even when the pixel region passes. A broadly related symbol is not an acceptable substitute.
 
 For transparent or extracted raster assets, run:
 
@@ -90,7 +90,7 @@ For transparent or extracted raster assets, run:
 python scripts/audit-raster-asset-integrity.py <asset-or-directory> --fail-on-risk --contact-sheet asset-audit.png
 ```
 
-Treat visible alpha pixels entering the edge-risk band, implausibly tight visible bounds, undersized assets, and unexpectedly low subject occupancy as asset risks. An opaque rectangle cannot be cleared for alpha-edge clipping by this audit; inspect the source crop and rendered placement manually.
+Treat visible alpha pixels entering the edge-risk band, implausibly tight bounds, undersized assets, and low subject occupancy as asset risks. The hybrid PPTX audit checks embedded hashes, crop and transformed physical placement, including effective DPI and visible subject dimensions. An opaque rectangle cannot be cleared for alpha-edge clipping. Inspect the source and render on light, dark and actual backgrounds; white fringing and scientific invariants remain visual checks, not alpha-statistic PASS.
 
 ## Layout, routing, and rendering
 

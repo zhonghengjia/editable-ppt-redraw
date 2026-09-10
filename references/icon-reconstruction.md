@@ -17,14 +17,14 @@ Treat these features as fidelity requirements. A symbol that conveys only the br
 
 For a `fast` task, keep the signature in the working notes. For a `standard` or `dense` task, inventory every recognition-dependent symbol. When a visual manifest is used, record the inventory in its optional `icon_signatures` field with a stable icon ID, owning module, object class, and non-empty list of required features. Do not reuse one generic signature across icons that represent different object classes.
 
-## Choose one coherent native representation
+## Choose one coherent component representation
 
-Use the simplest representation that preserves the selected reconstruction mode's requirements. For faithful source-specific scientific objects, side/cutaway views or layered complex symbols, read [component-fidelity.md](component-fidelity.md) before authoring; a recognition signature alone is insufficient. Use one native representation:
+Use the simplest representation that preserves the selected reconstruction mode's requirements. For faithful source-specific scientific objects, side/cutaway views or layered complex symbols, read [component-fidelity.md](component-fidelity.md) before authoring; a recognition signature alone is insufficient. Choose one representation:
 
 1. Reuse the source's native object when editing an existing artifact in the same target format and the object is suitable.
 2. Use a small module of AutoShapes for geometry defined by circles, rectangles, polygons, and straight segments.
 3. Use one or a few native custom paths for continuous curved tubing, outlines, cutting edges, organic contours, or distinctive silhouettes. Preserve cubic Bézier paths directly when available. The [native toolkit](native-toolkit.md) imports supported SVG components without fragmenting curves into bars or pictures. Use sampling only when the selected backend cannot represent curves, and verify the approximation at delivered size.
-4. Use a disclosed raster or limited-editability vector only when an honest target-native reconstruction is impractical and the selected reconstruction mode permits it.
+4. If native reconstruction is impractical and the user approves object-level editing, use [hybrid-components.md](hybrid-components.md). Prefer suitable original/local/licensed assets before generating an isolated component; preserve the approved recognition and structure invariants. Never flatten its label, data, or cross-component relation into the asset.
 
 Do not assemble a continuous curved source symbol from separated rotated bars, short line fragments, or background-colored masks when that construction creates visible gaps, false branches, abrupt joints, or dependence on one panel fill. Keep line continuity and z-order stable after export and reopen or reparse.
 
@@ -41,7 +41,7 @@ When a compact symbol remains raster, the crop must preserve the complete visibl
 - reject neighboring text, borders, connectors, shadows, or unrelated components inside the asset;
 - keep the final asset project-local and record the source crop or provenance in the manifest.
 
-Run `scripts/audit-raster-asset-integrity.py <asset-or-directory> --fail-on-risk` before placement and again on any corrected extraction. The script checks readability, alpha-visible bounds, edge contact, occupancy, and minimum visible size; semantic recognizability still requires the recognition-signature comparison below.
+Run `scripts/audit-raster-asset-integrity.py <asset-or-directory> --fail-on-risk` before placement and again on any corrected extraction. The script checks readability, alpha-visible bounds, edge contact, occupancy, and canvas size. The hybrid package audit additionally checks visible subject pixels and physical placement resolution; semantic recognizability still requires the recognition-signature comparison below.
 
 ## Construct by semantic parts
 

@@ -1,6 +1,6 @@
 # Execution profiles and bounded reconstruction
 
-Select one profile before choosing a builder or drawing objects. The profile controls planning depth and QA cost; it does not lower the fidelity or editability promised to the user. Use `standard` when classification is uncertain.
+Select one profile before choosing a builder or drawing objects. The profile controls planning depth and QA cost; it does not lower the fidelity or editability promised to the user. Use `standard` when classification is uncertain. Approved hybrid work uses at least `standard` with the asset-backed manifest in [hybrid-components.md](hybrid-components.md); dense compositions still use `dense`.
 
 ## Profile selection
 
@@ -17,7 +17,7 @@ Required work:
 - render the complete output when a local render path exists and inspect composition, clipping, and text wrapping;
 - run connector or icon checks only when those features are present.
 
-Do not create a visual manifest or contact sheet solely because the tools exist.
+Do not create a visual manifest or contact sheet solely because the tools exist. This native fast profile does not apply to generated/approved hybrid components.
 
 ### `standard`
 
@@ -73,6 +73,8 @@ Record the selected backend, version when readily available, failed probe if any
 ## Bounded correction cycle
 
 Use exactly one canonical builder, source document, or manifest-backed source model.
+
+Component generation belongs to this same construction/correction budget, not a separate retry loop. Retain failed requests and stop the affected component if the tool fails or the correction still fails; never insert a placeholder to report completion.
 
 1. Complete one coherent construction pass.
 2. Reopen or reparse the actual output and collect the checks required by the selected profile using [quality-runner.md](quality-runner.md). Missing evidence remains unverified; manual render checks remain separate from automatic results.

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import math
 import sys
@@ -131,6 +132,50 @@ def checkerboard(width: int, height: int, cell: int = 12) -> Image.Image:
                 fill=colors[((x // cell) + (y // cell)) % 2],
             )
     return canvas
+
+
+def audit_placement(blob, matrix, crop, min_dpi, min_visible_pixels):
+    """Measure real embedded pixels at their actual transformed physical size.
+
+    matrix maps uncropped picture-frame UV to slide inches. Alpha is assessed
+    before resampling; transparent padding cannot inflate visible pixel support.
+    No image is edited and no white-fringe detection is inferred from alpha.
+    """
+    errors = []
+    try:
+        with Image.open(io.BytesIO(blob)) as image:
+            rgba = image.convert('RGBA')
+        w,h = rgba.size
+        l,t,r,b = crop
+        if not all(math.isfinite(v) and 0 <= v < 1 for v in crop) or l+r >= 1 or t+b >= 1:
+            raise ValueError('unsupported/invalid crop')
+        box = (math.ceil(l*w),math.ceil(t*h),math.floor((1-r)*w),math.floor((1-b)*h))
+        if box[2] <= box[0] or box[3] <= box[1]:
+            raise ValueError('crop has no complete source pixels')
+        visible = alpha_bbox(rgba,8)
+        cut = alpha_bbox(rgba.crop(box),8)
+        if not visible or not cut:
+            raise ValueError('no visible pixels in placed asset')
+        if visible[0] < box[0] or visible[1] < box[1] or visible[2] > box[2] or visible[3] > box[3]:
+            errors.append('crop removes alpha-visible source pixels')
+        physical_w = math.hypot(matrix[0],matrix[1])
+        physical_h = math.hypot(matrix[2],matrix[3])
+        if min(physical_w,physical_h) <= 0:
+            raise ValueError('nonpositive physical placement')
+        dpi = [(1-l-r)*w/physical_w,(1-t-b)*h/physical_h]
+        support = [cut[2]-cut[0],cut[3]-cut[1]]
+        if min(dpi) < min_dpi:
+            errors.append('effective resolution below predeclared min_dpi')
+        if min(support) < min_visible_pixels:
+            errors.append('visible subject pixels below predeclared minimum')
+        expected_ratio = (1-l-r)*w/((1-t-b)*h)
+        if abs((physical_w/physical_h)/expected_ratio-1) > .005:
+            errors.append('picture aspect ratio distorted beyond 0.5% serialization allowance')
+        return dict(errors=errors,effective_dpi=dpi,visible_pixels=support,
+                    visible_inches=[support[0]/dpi[0],support[1]/dpi[1]],
+                    edge_color_review='NOT_VERIFIED')
+    except (OSError,ValueError,TypeError) as exc:
+        return {'errors':[str(exc)],'edge_color_review':'NOT_VERIFIED'}
 
 
 def build_contact_sheet(report: dict[str, Any], output: Path) -> None:

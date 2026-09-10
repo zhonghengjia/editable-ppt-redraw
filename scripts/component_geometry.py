@@ -74,41 +74,83 @@ def checked_mask(value):
     return value
 
 
-def topology(mask):
-    """Foreground 8-connected / background 4-connected; all pixels retained."""
+def label_regions(mask, diagonal=True):
+    """Deterministic row-major components shared by source ownership and QA."""
     import numpy as np
     mask = checked_mask(mask)
     h,w = mask.shape
+    labels = np.zeros(mask.shape, dtype=np.int32)
+    neighbours = [(-1,0),(1,0),(0,-1),(0,1)]
+    if diagonal:
+        neighbours += [(-1,-1),(-1,1),(1,-1),(1,1)]
+    regions = []
+    for y,x in zip(*np.nonzero(mask)):
+        if labels[y,x]:
+            continue
+        identity = len(regions)+1
+        x,y = int(x),int(y)
+        queue = deque([(y,x)]); labels[y,x] = identity
+        count, touches = 0, False
+        left,right,top,bottom = x,x,y,y
+        while queue:
+            cy,cx = queue.popleft(); count += 1
+            touches |= cy == 0 or cx == 0 or cy == h-1 or cx == w-1
+            left,right,top,bottom = min(left,cx),max(right,cx),min(top,cy),max(bottom,cy)
+            for dy,dx in neighbours:
+                ny,nx = cy+dy,cx+dx
+                if 0 <= ny < h and 0 <= nx < w and mask[ny,nx] and not labels[ny,nx]:
+                    labels[ny,nx] = identity; queue.append((ny,nx))
+        regions.append(dict(id=identity, area=count, bbox=[left,top,right-left+1,bottom-top+1], touches_border=touches))
+    return labels, regions
 
-    def regions(binary, diagonal):
-        seen = np.zeros_like(binary)
-        neighbours = [(-1,0),(1,0),(0,-1),(0,1)]
-        if diagonal:
-            neighbours += [(-1,-1),(-1,1),(1,-1),(1,1)]
-        sizes, internal = [], []
-        for y,x in zip(*np.nonzero(binary)):
-            if seen[y,x]:
-                continue
-            queue = deque([(int(y),int(x))]); seen[y,x] = True
-            count, touches = 0, False
-            while queue:
-                cy,cx = queue.popleft(); count += 1
-                touches |= cy == 0 or cx == 0 or cy == h-1 or cx == w-1
-                for dy,dx in neighbours:
-                    ny,nx = cy+dy,cx+dx
-                    if 0 <= ny < h and 0 <= nx < w and binary[ny,nx] and not seen[ny,nx]:
-                        seen[ny,nx] = True; queue.append((ny,nx))
-            sizes.append(count)
-            if not touches:
-                internal.append(count)
-        return sizes, internal
 
-    components,_ = regions(mask, True)
-    _,holes = regions(~mask, False)
+def topology(mask):
+    """Foreground 8-connected / background 4-connected; all pixels retained."""
+    mask = checked_mask(mask)
+    _, foreground = label_regions(mask, True)
+    _, background = label_regions(~mask, False)
+    components = [r['area'] for r in foreground]
+    holes = [r['area'] for r in background if not r['touches_border']]
     return dict(components=len(components), holes=len(holes),
                 largest_component_areas=sorted(components, reverse=True)[:10],
                 largest_hole_areas=sorted(holes, reverse=True)[:10],
                 foreground_pixels=int(mask.sum()), connectivity='foreground8_background4')
+
+
+def owned_support(mask, recipe, source_sha256, crop, selector_sha256):
+    """Source-only membership selection. Never applied to an evaluated render."""
+    mask = checked_mask(mask)
+    keys = {'part_id','source_sha256','source_bbox','selector_sha256','seeds','observation'}
+    if not isinstance(recipe,dict) or set(recipe) != keys:
+        raise ValueError('ownership requires exactly part_id, source_sha256, source_bbox, selector_sha256, seeds, observation')
+    for key in ('part_id','observation'):
+        if not isinstance(recipe[key],str) or not recipe[key].strip():
+            raise ValueError('ownership '+key+' must be nonempty text')
+    if recipe['source_sha256'] != source_sha256 or recipe['selector_sha256'] != selector_sha256:
+        raise ValueError('ownership source or selector hash mismatch')
+    if (not isinstance(recipe['source_bbox'],list) or len(recipe['source_bbox']) != 4
+            or not all(type(v) is int for v in recipe['source_bbox']) or recipe['source_bbox'] != crop):
+        raise ValueError('ownership source_bbox mismatch')
+    seeds = recipe['seeds']
+    if not isinstance(seeds,list) or not 1 <= len(seeds) <= 100:
+        raise ValueError('ownership requires 1..100 crop-local source witnesses')
+    h,w = mask.shape
+    for seed in seeds:
+        if (not isinstance(seed,list) or len(seed) != 2 or not all(type(v) is int for v in seed)
+                or not 0 <= seed[0] < w or not 0 <= seed[1] < h or not mask[seed[1],seed[0]]):
+            raise ValueError('ownership seed must hit source support; no snapping to nearest component')
+    if len({tuple(s) for s in seeds}) != len(seeds):
+        raise ValueError('ownership seeds must be unique')
+    labels, regions = label_regions(mask)
+    if len(regions) > 2000:
+        raise GeometryLimit('ownership ledger exceeds 2000 components; no fragments discarded')
+    identities = {int(labels[y,x]) for x,y in seeds}
+    if len(identities) != 1:
+        raise ValueError('ownership witnesses disagree: one connected visible part required per recipe')
+    identity = identities.pop()
+    return labels == identity, dict(recipe=recipe, selected_component=identity,
+        unassigned_components=[r for r in regions if r['id'] != identity],
+        selected=regions[identity-1], semantics_verified=False)
 
 
 def boundary(mask):
@@ -167,12 +209,41 @@ def compare_masks(first, second):
     return result
 
 
+def coverage_changes(first, second):
+    """Locate new voids and filled source holes; never repair either mask.
+
+    Compare position and source support, not only equal hole counts. Missing
+    regions connected to the crop edge remain reported as open coverage losses.
+    """
+    import numpy as np
+    first,second=checked_mask(first),checked_mask(second)
+    if first.shape!=second.shape:
+        raise ValueError('coverage masks have different dimensions')
+    def events(voids, occupied):
+        labels,regions=label_regions(voids,diagonal=False)
+        if len(regions)>2000:
+            raise GeometryLimit('coverage event ledger exceeds 2000 regions')
+        counts=np.bincount(labels[occupied].ravel(),minlength=len(regions)+1)
+        return [dict(region, changed_pixels=int(counts[region['id']]))
+                for region in regions if not region['touches_border'] and counts[region['id']]]
+    introduced=events(~second,first)
+    filled=events(~first,second)
+    _,missing=label_regions(first & ~second,diagonal=False)
+    if len(missing)>2000:
+        raise GeometryLimit('missing-support ledger exceeds 2000 regions')
+    return dict(introduced_holes=introduced,filled_source_holes=filled,
+        introduced_hole_pixels=sum(r['changed_pixels'] for r in introduced),
+        filled_source_hole_pixels=sum(r['changed_pixels'] for r in filled),
+        missing_support_regions=missing,
+        scope='source-visible support only; crop-edge background is not a hole')
+
+
 def validate_structure(value):
     if not isinstance(value, dict):
         return ['structure must be an object']
     errors = selector_errors(value.get('selector'))
     expected = {'selector','min_iou','max_boundary_px','max_boundary_p95_px','topology','rationale'}
-    if set(value) != expected:
+    if set(value) not in (expected, expected | {'coverage'}):
         errors.append('structure requires exactly selector, min_iou, max_boundary_px, max_boundary_p95_px, topology, rationale')
     for key in ('min_iou','max_boundary_px','max_boundary_p95_px'):
         number = value.get(key)
@@ -184,6 +255,12 @@ def validate_structure(value):
         errors.append('topology must be exact or report_only')
     if not isinstance(value.get('rationale'),str) or not value['rationale'].strip():
         errors.append('structure rationale must freeze tolerances and explain topology choice before authoring')
+    if 'coverage' in value:
+        coverage=value['coverage']
+        fields={'max_introduced_hole_pixels','max_filled_source_hole_pixels'}
+        if not isinstance(coverage,dict) or set(coverage)!=fields or any(
+                type(v)is not int or not 0<=v<=MAX_PIXELS for v in coverage.values()):
+            errors.append('coverage requires bounded integer new-hole and filled-source-hole pixel limits')
     return errors
 
 
@@ -192,9 +269,13 @@ def compare(first, second, contract):
     if errors:
         raise ValueError('; '.join(errors))
     result = compare_masks(select(first,contract['selector']), select(second,contract['selector']))
+    if 'coverage' in contract:
+        result['coverage']=coverage_changes(select(first,contract['selector']),select(second,contract['selector']))
+        result['coverage']['passed']=all(result['coverage'][k] <= contract['coverage']['max_'+k]
+            for k in ('introduced_hole_pixels','filled_source_hole_pixels'))
     topology_equal = all(result['source_topology'][key] == result['render_topology'][key] for key in ('components','holes'))
     result.update(topology_equal=topology_equal, topology_gate=contract['topology'],
                   coordinate_frame='region_local_source_pixels', matte='white',
                   semantic_segmentation='NOT_VERIFIED')
-    result['passed'] = result['iou'] >= contract['min_iou'] and result['boundary_max_px'] <= contract['max_boundary_px'] and result['boundary_p95_px'] <= contract['max_boundary_p95_px'] and (contract['topology'] == 'report_only' or topology_equal)
+    result['passed'] = result['iou'] >= contract['min_iou'] and result['boundary_max_px'] <= contract['max_boundary_px'] and result['boundary_p95_px'] <= contract['max_boundary_p95_px'] and (contract['topology'] == 'report_only' or topology_equal) and result.get('coverage',{}).get('passed',True)
     return result

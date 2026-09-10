@@ -21,6 +21,7 @@ from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE, PP_PLACEHOLDER
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.oxml import parse_xml
 from pptx.util import Inches, Pt
+from native_paint import paint_xml
 
 from vendor.svg_paths.drawingml_paths import (
     PathCommand, normalize_path_commands, parse_svg_path,
@@ -31,6 +32,9 @@ SVG_NS = 'http://www.w3.org/2000/svg'
 A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main'
 P_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main'
 EMU = 914400
+MAX_SVG_BYTES = 2_000_000
+MAX_SVG_ELEMENTS = 2000
+MAX_PATH_CHARS = 100_000
 IDENTITY = (1., 0., 0., 1., 0., 0.)
 STYLE = {'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
          'color', 'fill-rule', 'fill-opacity', 'stroke-opacity'}
@@ -144,7 +148,7 @@ def read_vectors(source, color='#173D6A'):
     """Return validated paths, viewBox and provenance. Text is intentionally rejected."""
     source = Path(source)
     raw = source.read_bytes()
-    if len(raw) > 2_000_000:
+    if len(raw) > MAX_SVG_BYTES:
         raise SVGProfileError('SVG exceeds the 2 MB component limit')
     try:
         text = raw.decode('utf-8-sig')
@@ -159,7 +163,7 @@ def read_vectors(source, color='#173D6A'):
     if root.tag not in ('svg', f'{{{SVG_NS}}}svg'):
         raise SVGProfileError('Expected SVG root')
     elements = list(root.iter())
-    if len(elements) > 2000:
+    if len(elements) > MAX_SVG_ELEMENTS:
         raise SVGProfileError('SVG exceeds the 2000 element component limit')
     viewbox = numbers(root.get('viewBox', '')) or [0, 0, number(root.get('width')), number(root.get('height'))]
     if len(viewbox) != 4 or min(viewbox[2:]) <= 0:
@@ -200,7 +204,7 @@ def read_vectors(source, color='#173D6A'):
         if len(elem):
             raise SVGProfileError(f'{label}: nested content on a primitive is unsupported')
         d = path_for(tag, elem)
-        if not d.strip() or len(d) > 100_000:
+        if not d.strip() or len(d) > MAX_PATH_CHARS:
             raise SVGProfileError(f'{label}: empty or excessively long path')
         try:
             commands = normalize_path_commands(svg_path_to_absolute(parse_svg_path(d)))
@@ -239,6 +243,27 @@ def read_vectors(source, color='#173D6A'):
     return specs, viewbox, hashlib.sha256(raw).hexdigest()
 
 
+def path_shape_xml(spec, shape_id, name, ox, oy, scale):
+    """Shared native path emitter for SVG solids and manifest component Paint."""
+    inner, left, top, w, h = path_commands_to_drawingml(spec['commands'], ox, oy, scale, scale)
+    cap = {'butt': 'flat', 'round': 'rnd', 'square': 'sq'}[spec['cap']]
+    join = {'miter': '<a:miter lim="400000"/>', 'round': '<a:round/>', 'bevel': '<a:bevel/>'}[spec['join']]
+    stroke = spec['stroke'] if spec['stroke_width'] else None
+    elem = parse_xml(
+        f'<p:sp xmlns:p="{P_NS}" xmlns:a="{A_NS}"><p:nvSpPr>'
+        f'<p:cNvPr id="{shape_id}" name={quoteattr(name)}/><p:cNvSpPr/><p:nvPr/>'
+        f'</p:nvSpPr><p:spPr><a:xfrm><a:off x="{round(left*9525)}" y="{round(top*9525)}"/>'
+        f'<a:ext cx="{round(w*9525)}" cy="{round(h*9525)}"/></a:xfrm>'
+        '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/>'
+        '<a:rect l="l" t="t" r="r" b="b"/><a:pathLst>'
+        f'<a:path w="{round(w*9525)}" h="{round(h*9525)}">{inner}</a:path>'
+        f'</a:pathLst></a:custGeom>{paint_xml(spec["fill"], spec["alpha"][0])}'
+        f'<a:ln w="{round(spec["stroke_width"]*scale*9525)}" cap="{cap}">'
+        f'{paint_xml(stroke, spec["alpha"][1])}{join}</a:ln></p:spPr></p:sp>'
+    )
+    return elem, [left / 96, top / 96, w / 96, h / 96]
+
+
 def add_svg_component(slide, source, x, y, width, height, *, name='vector', color='#173D6A'):
     """Import a whole validated component as native paths in one editable group.
 
@@ -255,29 +280,11 @@ def add_svg_component(slide, source, x, y, width, height, *, name='vector', colo
     element_map = []
     next_id = max(int(n.get('id')) for n in slide._element.iter(f'{{{P_NS}}}cNvPr')) + 2
     for index, spec in enumerate(specs):
-        inner, left, top, w, h = path_commands_to_drawingml(spec['commands'], ox, oy, scale, scale)
+        elem, bounds = path_shape_xml(spec, next_id + index, name + '/' + spec['id'], ox, oy, scale)
         element_map.append({'source_id': spec['id'], 'shape_id': next_id + index,
                             'output_name': name + '/' + spec['id'],
-                            'bounds_inches': [left / 96, top / 96, w / 96, h / 96]})
-        def fill_xml(value, opacity):
-            return '<a:noFill/>' if value is None else (
-                f'<a:solidFill><a:srgbClr val="{value}"><a:alpha val="{round(opacity*100000)}"/>'
-                '</a:srgbClr></a:solidFill>')
-        cap = {'butt': 'flat', 'round': 'rnd', 'square': 'sq'}[spec['cap']]
-        join = {'miter': '<a:miter lim="400000"/>', 'round': '<a:round/>', 'bevel': '<a:bevel/>'}[spec['join']]
-        stroke = spec['stroke'] if spec['stroke_width'] else None
-        xml_parts.append(parse_xml(
-            f'<p:sp xmlns:p="{P_NS}" xmlns:a="{A_NS}"><p:nvSpPr>'
-            f'<p:cNvPr id="{next_id+index}" name={quoteattr(name+"/"+spec["id"])}/><p:cNvSpPr/><p:nvPr/>'
-            f'</p:nvSpPr><p:spPr><a:xfrm><a:off x="{round(left*9525)}" y="{round(top*9525)}"/>'
-            f'<a:ext cx="{round(w*9525)}" cy="{round(h*9525)}"/></a:xfrm>'
-            '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/>'
-            '<a:rect l="l" t="t" r="r" b="b"/><a:pathLst>'
-            f'<a:path w="{round(w*9525)}" h="{round(h*9525)}">{inner}</a:path>'
-            f'</a:pathLst></a:custGeom>{fill_xml(spec["fill"], spec["alpha"][0])}'
-            f'<a:ln w="{round(spec["stroke_width"]*scale*9525)}" cap="{cap}">'
-            f'{fill_xml(stroke, spec["alpha"][1])}{join}</a:ln></p:spPr></p:sp>'
-        ))
+                            'bounds_inches': bounds})
+        xml_parts.append(elem)
     group = slide.shapes.add_group_shape()
     group.name = name
     for elem in xml_parts:

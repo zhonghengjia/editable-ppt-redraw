@@ -232,6 +232,17 @@ class EvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             self.assertFalse(RUNNER.run_checks(Path(folder)/'missing.pptx')['automation_passed'])
 
+    def test_structure_only_inventory_invokes_regional_audit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'shape.svg'
+            path.write_text('<svg viewBox="0 0 10 10"><rect width="5" height="5"/></svg>')
+            mf=Path(folder)/'manifest.json'
+            mf.write_text(json.dumps({'mode':'faithful','source_inventory':[{'id':'shape','structure_sensitive':True}]}))
+            report=RUNNER.run_checks(path,mf)
+            check=next(c for c in report['checks'] if c['check']=='regional_fidelity')
+            self.assertEqual(check['status'],'FAIL')
+            self.assertTrue(check['required_for_automation'])
+
     def test_runner_invalid_contract_is_reported_not_crashed(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'shape.svg'

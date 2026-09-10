@@ -55,7 +55,11 @@ Use $editable-ppt-redraw to reconstruct this published figure as an editable PPT
 
 ## Quality gates
 
-Version 3.4.0 combines curve, text, typography, endpoint, host-surface and label-clearance checks with source-frozen visible-support extraction and structural diagnostics. The [text-fidelity contract](references/text-fidelity.md) checks actual native shafts, tips and adjacent text separately from content and font ratios. [Component fidelity](references/component-fidelity.md) separates color mismatch from missing/extra support, bidirectional pixel-boundary distance and component/hole counts; its selector mode reuses pinned ImageTracerJS without filling holes or deleting fragments. Existing color limits remain mandatory. Ambiguous segmentation, resource limits and unreviewed semantic grouping do not become passes. Run the applicable local checks through:
+Version 3.11.0 combines [joint marked-source assembly construction](references/component-fidelity.md#marked-source-assemblies) with explicit disjoint or opaque color-tree paint composition. Source-observed support and markers establish candidate visible ownership; both paint modes reuse one pinned boundary scanner and the [native part/paint serializer](references/native-toolkit.md). Opaque color-tree layers can reduce internal antialias background leaks while retaining source holes, visible quantized colors and the same editing budget. The manifest construction entrypoint checks declared appearance/region contracts and source binding before emitting shapes. Actual native rendering still requires independent review: quantization and pixel steps remain, contacts between owners may show seams, and color layers do not automatically identify nuclei or other semantic parts. Native Paint remains available for source-supported smooth parts and continuous fills. No new model, runtime dependency or arbitrary SVG-gradient import is introduced.
+
+Source-bound appearance observations and final-render evidence retain their existing scope. Text, data and critical relations stay native; [approved picture components](references/hybrid-components.md) support move/scale/replace, not internal vector editing. Choose the editing unit before generating a complex assembly. Optional built-in generation still requires scoped approval. Native construction fixtures do not certify biological identity or fidelity of a new user figure.
+
+The [source-specific native pipeline](references/component-fidelity.md) retains its existing source-edge, fitted and palette-partition routes, source-bound editing budgets and curve/text/typography/host-surface checks. No native import limits or fidelity thresholds were relaxed. Exact edges retain stair steps, quantization approximates gradients, and neither tracing nor generation recovers hidden experimental evidence. Run the applicable local checks through:
 
 ~~~bash
 python scripts/run-quality-checks.py output.pptx --manifest visual-manifest.json --layout reopened.layout.json --json quality-report.json --fail-on-risk
@@ -71,6 +75,8 @@ See [the QA contract](references/quality-runner.md) for optional arguments, requ
 - PowerPoint connector bindings;
 - curve-coordinate fidelity;
 - raster asset integrity;
+- approved component provenance, native-role coverage, embedded media and placement;
+- read-only regenerated-component replacement qualification;
 - source-versus-output comparison sheets.
 
 A passing validator is not treated as a substitute for inspecting the rendered final artifact.

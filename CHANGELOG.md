@@ -1,5 +1,86 @@
 # Changes
 
+## 3.11.0 — 2026-09-10 — source paint composition and construction preflight
+
+- Added explicitly planned opaque color-tree composition to the existing palette boundary pipeline. Tree masks stay inside source-visible support; transparent holes, quantized visible colors and existing budgets remain invariant. No output-derived filler, stroke inflation, new renderer or model.
+- Replaced late-only validation for manifest-based native construction with shared appearance/regional preflight and exact source binding before slide mutation.
+- Made structure-only declarations invoke the same regional auditor instead of appearing not applicable.
+- Added source-color reconstruction, true-hole, translucency rejection, budget and preflight regressions. Pixel stairs, owner-boundary antialiasing and biological identity remain independently reviewed limitations.
+
+## 3.10.0 — 2026-09-10 — joint visible coverage
+
+- Replaced independent-object reconstruction guidance for touching assemblies with a common source-support/ownership/boundary pipeline.
+- Added a bounded marked-source candidate partition adapter that reuses the pinned ImageTracerJS palette boundary scan and native component/paint serializer. No output-hole fill, inflation, hidden continuation, new model or runtime dependency.
+- Extended the existing regional structure contract with located introduced-hole and filled-source-hole evidence; retained open-crack reporting and all previous color/distance checks.
+- Added regression tests for shared coverage, real holes, ownership ambiguity/failure, source binding, complexity limits and hole relocation.
+
+## 3.9.0 — 2026-09-09 — executable native appearance
+
+- Converted the approved 24-candidate review into a lightweight construction
+  capability: manifest part trees, nested local coordinates and editable groups.
+- Reused the existing path serializer with one native Paint implementation for
+  solid, linear and bounded Office path gradients, including multiple alpha stops.
+  The restricted SVG-input profile remains explicit and unchanged.
+- Added opaque source-patch color sampling into real Paint values, source-bound
+  construction verification, and retained independent final-render evidence.
+- Replaced representation guidance in its authoritative locations: no default
+  whole-assembly image when internal parts must remain editable. No model installs,
+  asset imports, pixel-fidelity claims or per-figure coordinates were introduced.
+- Qualified synthetic cells, attached surface details and a non-biological surface
+  through native export and real Office 16.0 save/reopen/render/edit. Inner-group
+  editing requires exposing it by ungrouping its outer assembly in the tested COM
+  workflow; file nesting alone is not a universal selection guarantee.
+
+## 3.8.0 — 2026-09-09 — source-bound appearance contracts
+
+- Integrated the approved 23-project source review into one appearance contract
+  shared by source inventory, generation preflight and the existing quality runner.
+- Reused Pillow/NumPy, the existing final-render provenance gate and recursive PPT
+  reader. Added declared source-relative color/tone diagnostics and scoped native,
+  mixed and raster-internal evidence. No new model, dependency or vendor fork.
+- Bound generated prompts to authorized invariant requirements and their contract
+  hash. Changed contracts/prompts cannot inherit stale evidence. Legacy native
+  schemas remain compatible; legacy hybrid appearance is explicitly unverified.
+- Replaced overlapping planning and acceptance guidance. Flat sources, brighter
+  foregrounds, uncertain overlap and unsupported scope do not inherit invented
+  depth or an overall similarity pass. Manual scientific review remains separate.
+- Added adverse/control regressions for appearance, provenance, representation,
+  generation and runner boundaries. Existing native geometry thresholds unchanged.
+
+## 3.7.0 — 2026-09-09 — governed hybrid components
+
+- Kept the three reconstruction modes and native defaults; added an orthogonal,
+  explicitly approved hybrid editing policy with object-level picture scope.
+- After review of 22 related projects, reused existing package/Pillow capabilities
+  for one asset/instance contract, built-in generation preflight, provenance hashes,
+  recursive picture transforms, crop/visible-resolution/anchor checks and strict
+  read-only replacement qualification. No new server, model stack or dependency.
+- Integrated the contract into the existing manifest validator, PPTX auditor and
+  quality runner. Native-required roles cannot be assigned to images. Generation
+  permission and transmitted-reference permission remain separate; failed outputs
+  cannot enter the approved asset inventory.
+- Replaced conflicting raster/native-only guidance across mode, backend, component
+  and QA references. Kept exact native structure gates unchanged and manual visual
+  review distinct. Automated provenance is not authenticated scientific truth.
+- Added isolated contract, media/geometry, failure-path, replacement and runner
+  regressions. Live generation and arbitrary scientific-figure fidelity are not
+  implied by this release entry; Git publication is a separate user action.
+
+## 3.6.0 — 2026-09-09 — bounded source paint partition
+
+- Reviewed the relevant implementation paths of 22 GitHub projects; retained the existing pinned ImageTracer/Pillow stack without new packages, models or hosted processing. Shared-boundary and safe compound-path organization informed the adapter, rather than adding figure-specific geometry.
+- Replaced ad-hoc per-color tracing with an explicit `palette_edges` representation: one quantized source image, exact lattice contours, intact hole-parent packing and no independent fitting, dropped fragments or invisible backdrop repair. Existing default representations remain explicit and compatible.
+- Introduced source-bound part plans with predeclared native path/command budgets, quantization error provenance, region-to-packed-path ranges and fail-closed diagnostics. Centralized existing native import limits without raising them. Packing reduces serialization/object overhead, not geometric complexity or semantic editing work.
+- Added exact pixel-center, adjacency, holes, transparency, random partition, budget refusal, immutable failure-output and native readback tests. Full-figure source fidelity and native rendering remain separate gates; this change does not imply Git publication.
+
+## 3.5.0 — 2026-09-09 — source-owned representation pipeline
+
+- Replaced inline selector tracing with one source preparation/ownership stage, explicit contour representation, native preflight and provenance. Shared component traversal governs source membership and structural diagnostics; no figure-specific geometry or exception rules.
+- Selected support now defaults to pinned ImageTracerJS raw pixel-cell edges with exact collinear collapse and compound hole winding. Ordinary color tracing retains fitted contours; callers can explicitly request smooth support, without automatic fallbacks. Upstream code and runtime dependencies are unchanged.
+- Added source/hash/crop/selector-bound connected-part witnesses, complete unassigned-component metadata and output path/command complexity. No largest-blob heuristic, hole filling, output ignore masks or hidden-surface inference.
+- On a frozen seven-case comparison, initial fitted candidates did not qualify all cases. One bounded raw-edge representation correction passed independent SVG and Microsoft PowerPoint 16.0 raster tests at the same limits. These are isolated support tests, not whole-figure acceptance; pixel stair steps, uniform-fill approximation and foreground occlusion holes remain explicit.
+- Added deterministic/adversarial regressions for source ownership, nested holes, single-pixel bridges, diagonal contacts, source-border geometry, random masks, native custom paths and fail-closed representation handling. No commit, push or release implied.
+
 ## 3.4.0 — 2026-09-09 — source support and structural evidence
 
 - Reviewed 21 related GitHub implementations, excluding a 3D mesh-only result; retained pinned ImageTracerJS/Pixelmatch instead of adding models or changing threshold semantics.

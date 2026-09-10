@@ -40,7 +40,8 @@ Do not install a renderer, desktop application, plugin, browser package, or syst
 ### PowerPoint
 
 - Use the supplied deck, master, theme, slide size, and layouts when present.
-- Keep ordinary text and redrawable components native and independently selectable.
+- For source-supported part hierarchies and continuous tones, the existing [native toolkit](native-toolkit.md) can emit grouped paths with native Paint. Its bounded Office gradients do not imply arbitrary SVG/mesh compatibility.
+- Keep ordinary text, data and critical relations native and independently selectable. For approved hybrid components, use independently named embedded pictures under [hybrid-components.md](hybrid-components.md); moving/scaling/replacing a picture is not internal vector editing.
 - Render and reopen the exported `.pptx`; run the PPTX editability audit and any applicable connector audit.
 
 ### SVG
@@ -48,7 +49,7 @@ Do not install a renderer, desktop application, plugin, browser package, or syst
 - Include an explicit `viewBox`; group modules and give important elements stable IDs.
 - Keep text as text unless the user specifically needs outlined glyphs.
 - Avoid external fonts, remote images, remote stylesheets, and scripts unless explicitly authorized and made portable.
-- Use raster `<image>` elements only for disclosed evidence or texture exceptions.
+- Disclose raster `<image>` elements and their evidence/illustration provenance. Approved hybrid output follows [hybrid-components.md](hybrid-components.md); current automated component package verification supports PPTX only, so other targets need independent verification and cannot inherit a PPTX PASS.
 
 ### draw.io
 
@@ -61,7 +62,7 @@ Do not install a renderer, desktop application, plugin, browser package, or syst
 
 - Use valid scene JSON with unique active element IDs, bound text for labels, and explicit arrow bindings when appropriate. Active arrow, label/container, frame and `boundElements` references must resolve to active elements; null bindings are valid free endpoints.
 - Preserve the source's reading order and relationships while accepting the requested sketch-like representation.
-- Keep image elements exceptional and disclosed.
+- Keep image elements explicitly scoped and disclosed under the selected editing policy.
 
 ### Mermaid and Graphviz
 

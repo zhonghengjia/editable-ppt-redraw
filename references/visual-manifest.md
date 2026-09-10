@@ -1,6 +1,6 @@
 # Visual manifest and layout fingerprint
 
-Use a visual manifest for dense, multi-panel, batch, or multi-output reconstruction. It is the compact source of truth for semantics, layout, uncertainty, and output routing. Do not require it for a trivial single icon or one small isolated module.
+Use a visual manifest for dense, multi-panel, batch, multi-output or approved hybrid reconstruction. It is the compact source of truth for semantics, layout, uncertainty, assets and output routing. A trivial native icon does not need one; a hybrid component does, to bind its authorization, bytes and output instance.
 
 ## Why it exists
 
@@ -213,7 +213,128 @@ The optional `text_clearance` contract is defined solely in [text-fidelity.md](t
 - Uncertain text, symbols, directions, and values.
 - Semantic constraints that must remain true and negative constraints that explicitly prohibit misleading topology, overlap, duplicate borders, raster shortcuts, or substitutions.
 
-`source_inventory[].representation` is one of `native_primitive`, `native_composite`, `source_crop`, or `evidence_raster`. A `source_crop` or `evidence_raster` item must reference a declared raster exception. Constraints use stable subject IDs and must state both the rule and how it will be verified. Positive semantic constraints use `must_connect`, `must_contain`, `must_preserve_text`, `same_style_token`, or `custom`; negative constraints use `must_not_connect`, `must_not_overlap`, `single_stroke_owner`, or `custom`. Constraint IDs are unique across both lists. Optional fields may record `execution_profile`, `icon_signatures`, panel labels, z-order, grouping, ports, axes, tables, legends, or source crop coordinates when they change authoring decisions. Each icon signature should identify its owning module, object class, non-empty required-feature list, and optional source crop. These fields extend schema version 1 and do not require a version bump.
+`source_inventory[].representation` is one of `native_primitive`, `native_composite`, `source_crop`, `evidence_raster`, or `component_raster`. The last selects the hybrid contract below. Legacy native-policy `source_crop`/`evidence_raster` items still reference `raster_exceptions`; hybrid manifests migrate pictures to component assets instead of duplicating that authority. Constraints use stable subject IDs and state both the rule and its verification. Positive constraints use `must_connect`, `must_contain`, `must_preserve_text`, `same_style_token`, or `custom`; negative constraints use `must_not_connect`, `must_not_overlap`, `single_stroke_owner`, or `custom`. IDs are unique across both lists. Optional fields can record grouping, ports, axes and source crops when relevant. Icon signatures identify an owning module, object class and nonempty required-feature list. These optional contracts extend schema version 1.
+
+## Executable native component contract (single authority)
+
+Optional `native_components` extends schema 1 with construction inputs, not another
+source inventory or an automatic reconstruction result. Each of 1..100 entries has
+exactly `id`, `output_name`, `viewbox: [x,y,width,height]`, and `parts`. `id` uniquely
+references a `native_composite` inventory item; its optional inventory output_name
+must agree. The viewbox describes local geometry, not an alternative source image.
+
+Each part has unique component-local `id` (no slash), a descriptive `role`, and a
+nonempty source/approval-grounded `observation`. Groups have `children`; leaves have
+SVG path `d` and `fill`. Optional `translate: [x,y]` and positive uniform `scale`
+compose in the parent's local frame. A group cannot also contain path/fill fields.
+Leaves optionally declare solid `stroke` and local `stroke_width` (default 0).
+List order is back-to-front. Output names are `component/ancestor/part`; the builder
+rejects collisions. Node/transform/paint fields are strict, so an unsupported
+rotation, clipping or opacity field cannot silently disappear.
+
+Paint values and numeric bounds have one authority in [native-toolkit.md](native-toolkit.md).
+Source sampling/provenance is defined in [appearance-fidelity.md](appearance-fidelity.md).
+Do not copy those schemas into separate manifests or store a second color truth.
+This compact synthetic example demonstrates syntax, not a biological template:
+
+```json
+{
+  "native_components": [{
+    "id": "source-object-01", "output_name": "object-01", "viewbox": [0,0,100,100],
+    "parts": [{
+      "id": "assembly", "role": "object", "observation": "Synthetic API example",
+      "children": [{
+        "id": "body", "role": "surface", "observation": "Synthetic curved boundary",
+        "d": "M10 20 C35 0 85 10 90 50 C85 90 20 95 10 20 Z",
+        "fill": {"kind":"path", "focus":[0.3,0.25], "stops":[
+          {"position":0,"color":"F4DFDD"}, {"position":1,"color":"A86173"}
+        ]}
+      }, {
+        "id":"detail", "role":"inner part", "observation":"Synthetic internal detail",
+        "d":"M40 40 L60 40 L60 60 L40 60 Z", "fill":"#704F69"
+      }]
+    }]
+  }]
+}
+```
+
+Use `native_components.add_manifest_component` from the existing builder with its
+ordinary placement inputs. It emits real paths/groups, consumes source-sampled
+Paint and returns the actual output mapping. Separate text/relationships remain
+ordinary native objects. New fields do not change existing manifests without this
+extension. Structural validation does not prove observations correct, parts attached
+or colors faithful; the established source/final-render checks retain their scope.
+
+## Hybrid component contract (single authority)
+
+Set `editing_policy: "hybrid"` and nonempty `hybrid_authorization` quoting the user's
+accepted editing scope. Omission means the existing `native` policy, including its
+legacy evidence exceptions. Keep faithful/semantic/redesign unchanged. Hybrid needs
+`component_assets`, `component_instances`, a complete `source_inventory`, and at
+least standard profile.
+
+Each asset has:
+
+- `asset_id`: unique reusable identity; `path`: manifest-relative local file;
+  `sha256`: lowercase hash of the exact approved bytes.
+- `source_kind`: `local`, `licensed`, `source_crop`, or `generated`; `origin` and
+  `authorization`: actual provenance and permitted use, not invented credentials.
+- `editing_unit`: independent semantic object. `extent: "object"` means
+  move/scale/replace only. `content_class`: `illustration` or `evidence`.
+  `contains_native_required: false` must follow inspection that the asset does not
+  flatten text, quantitative marks, legends or cross-component relationships.
+  A whole panel/reference/arbitrary tile is not an independent component.
+- `requires_alpha`: explicit boolean; `min_visible_pixels`: minimum visible width
+  AND height; `min_dpi`: minimum resolution at final physical placement. Select
+  task-appropriate limits before construction, not after a failed check.
+- `invariants`: nonempty source/approval-grounded descriptions of required
+  projection, gaps, terminals, branch counts and uncertainty.
+- `comparison`: `source_exact` for original/local/licensed assets; generated assets
+  use `approved_surrogate` and cannot claim original pixels or experimental data.
+- Licensed assets also require `license` and `attribution`. Source crops require
+  original `source_sha256` and source-pixel `source_bbox: [x,y,w,h]`.
+
+Generated assets additionally have a `generation` record:
+
+- `provider: "builtin_imagegen"`, `authorization`, `subject`, `style`, actual
+  `prompt`, and nonempty `invariants`.
+- `attempt`: 1 or 2 within the existing construction/correction budget; attempt 2
+  needs `correction_reason`. Only `status: "succeeded"` enters the asset list.
+- `references`: explicit list, `[]` for text-only generation. Every transmitted
+  image records `path`, `sha256`, `role` (`structure`, `style`, `edit_target`),
+  `transmitted_scope` and its own upload `authorization`. A transmitted crop's hash
+  identifies the actual crop, not the untransmitted whole source.
+- Returned model version, seed or request ID stays null or absent when unavailable.
+  Never fabricate reproducibility parameters.
+
+Each instance has:
+
+- unique `instance_id`, known `asset_id`, one-based `slide`, exact unique
+  `output_name`; one p:pic per instance, reusable assets can have many instances.
+- `bbox_inches: [left,top,width,height]`: planned slide-space axis-aligned bounds
+  after rotation/group transforms; `rotation`: effective clockwise degrees.
+- `crop: [left,top,right,bottom]`: explicit fractions of the source image, usually
+  `[0,0,0,0]`; each nonnegative and opposite sums below 1. Preserve visible content
+  and aspect. This verifier does not certify crops that remove alpha-visible pixels.
+- `placement_tolerance_inches`: 0..0.05, chosen before authoring; not a scientific
+  fidelity or font tolerance.
+- `anchors`: explicit list including `[]`. Each has unique `id`, `uv: [u,v]`
+  normalized to the full original asset canvas, and independently planned
+  `expected_inches: [x,y]` in slide space. Actual crop/group transforms are applied.
+  Static agreement does not prove interactive connector following.
+
+A raster inventory item uses `representation: "component_raster"` and a known
+`component_instance`; each instance maps to exactly one inventory item. Text,
+chart, table and connector roles, plus `native_required: true`, cannot use it.
+Hybrid native items require exact `output_name` and optional one-based
+`output_slide`/`required_count`. Coverage is checked against the actual package.
+
+`scripts/component_assets.py` implements this extension for the existing validator,
+PPTX audit and quality runner. Schema validation does not read assets; package audit
+compares actual local/embedded hashes, media integrity, geometry and coverage.
+Neither is a semantic segmentation engine or authenticated provenance. False
+origin/role assertions cannot be detected reliably from hashes; source/render
+review remains mandatory.
 
 `diagram_grammar.visual_type` names the source representation family. `preserve_visual_type` and `allow_representation_change` are booleans; when a representation change is allowed, `authorization` must contain the user's explicit instruction. `routing` is one of `orthogonal`, `direct`, `curved`, `mixed`, or `source_defined`. Each `node_roles` key references a module or source-inventory ID and declares a non-empty semantic `role`, one or more `allowed_geometries`, and the exact `output_names` that must carry that role in reopened layout inspection. Every connected module endpoint must have a node-role entry. Each `edge_roles` key references a connection ID and declares a semantic `role` plus an `output_name_regex` that must match one or more editable line objects. Every connection must have an edge-role entry. Names establish selection only, not endpoint truth; follow the endpoint-binding contract in [diagram-grammar.md](diagram-grammar.md).
 
@@ -251,10 +372,16 @@ Example for a chart inventory item named `ridge-01-source`:
 
 ## Module-first workflow
 
+Appearance-sensitive inventory uses `appearance_sensitive: true`. The shared
+`appearance_fidelity` extension, generation binding and render-review evidence
+are defined only in [appearance-fidelity.md](appearance-fidelity.md). Use it for
+all new hybrid work and any source-dependent tone/contour/occlusion requirement;
+do not duplicate these facts in an asset-specific correction ledger.
+
 1. Inventory modules and assign stable IDs.
 2. Inventory every visible item and assign its representation before authoring; a visible region with no inventory item is an unresolved planning gap.
 3. For a structured visual, declare its diagram grammar before changing layout or styling.
-4. Reconstruct each module within its declared bounding box.
+4. Freeze applicable appearance requirements before representation selection, then reconstruct each module within its declared bounding box.
 5. Export local crops or previews and compare them with the matching source region.
 6. Mark local modules acceptable before adding cross-module connections.
 7. Integrate shared legends, global titles, buses, and cross-panel connectors.

@@ -12,6 +12,15 @@ Use the first available route that passes a small native-object smoke test:
 
 The smoke test must create, save, reopen, and inspect one text box, one bordered shape, and one connector. Source-specific curved/layered objects additionally require the representative-component qualification in [component-fidelity.md](component-fidelity.md). Do not start a dense reconstruction when the selected route cannot preserve its required object types.
 
+For nested native parts or continuous tones, reuse the [native toolkit's executable
+component/Paint route](native-toolkit.md) inside the current builder. It provides
+real grouped paths and bounded Office gradients without an additional model.
+Its SVG input parser remains a separate restricted profile; do not infer arbitrary
+SVG-to-Office paint equivalence. Source-patch sampling supplies colors, not semantic
+part recognition, recovered anatomy or automatic lighting.
+
+For approved hybrid work, qualify a transparent embedded picture alongside native labels and relationships using [hybrid-components.md](hybrid-components.md). Keep the same target-owning authoring backend; image generation provides a local asset, not a replacement PPT builder or a web service. No additional model/server dependency is required by this route.
+
 ## SVG-first route
 
 SVG may be the canonical source when the visual is dominated by vector paths, freeform shapes, gradients, or reusable illustration modules. For local vector components, the bundled [native toolkit](native-toolkit.md) imports a restricted SVG profile as native curves using the selected python-pptx builder. Keep labels and semantic diagram nodes in native text/AutoShapes. The helper does not convert SVG text, arbitrary full figures or raster pixels.

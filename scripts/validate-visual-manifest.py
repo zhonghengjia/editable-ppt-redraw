@@ -20,6 +20,7 @@ SUPPORTED_REPRESENTATIONS = {
     "native_composite",
     "source_crop",
     "evidence_raster",
+    "component_raster",
 }
 SUPPORTED_ITEM_ROLES = {
     "text",
@@ -123,6 +124,17 @@ def validate_manifest(data: Any) -> dict[str, Any]:
 
     if data.get("schema_version") != 1:
         errors.append("schema_version must equal 1")
+
+    asset_spec = importlib.util.spec_from_file_location("component_assets", Path(__file__).with_name("component_assets.py"))
+    asset_module = importlib.util.module_from_spec(asset_spec)
+    asset_spec.loader.exec_module(asset_module)
+    errors.extend(asset_module.validate_contract(data))
+    errors.extend(asset_module.load('appearance_fidelity').validate_contract(data))
+    if 'native_components' in data:
+        try:
+            errors.extend(asset_module.load('native_components').validate_contract(data))
+        except ImportError as exc:
+            errors.append('native_components runtime unavailable: ' + str(exc))
 
     mode = data.get("mode")
     if mode not in SUPPORTED_MODES:

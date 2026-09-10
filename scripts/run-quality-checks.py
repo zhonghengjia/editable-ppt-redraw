@@ -72,7 +72,8 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
     pptx = artifact.suffix.lower() == '.pptx'
     if pptx:
         audited('editability', lambda: load('audit-pptx-editability').audit_pptx(
-            artifact, .8, source_inventory=manifest.get('source_inventory', [])))
+            artifact, .8, source_inventory=manifest.get('source_inventory', []),
+            component_manifest=manifest, manifest_path=manifest_path))
     else:
         module = load('audit-editable-source')
         fmt = module.detect_format(artifact, None)
@@ -82,6 +83,12 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
                 record('native_parser', 'NOT_VERIFIED', 'lexical inspection is not a native Mermaid/Graphviz parse')
         else:
             record('editable_source', 'NOT_VERIFIED', 'no supported auditor for this file type')
+
+    if manifest.get('editing_policy') == 'hybrid':
+        if not pptx:
+            record('component_assets', 'NOT_VERIFIED', 'PPTX component package audit is not implemented for this format')
+        record('component_visual_review', 'NOT_VERIFIED',
+               'Review each asset/instance against its comparison contract, invariants, light/dark/actual backgrounds and final-size render; no machine sign-off is inferred.', False)
 
     layouts = None
     if layout_path:
@@ -126,7 +133,14 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
         record('curves', 'NOT_APPLICABLE', 'no declared curves', False)
 
     inventory = manifest.get('source_inventory', [])
-    sensitive = isinstance(inventory, list) and any(isinstance(item, dict) and item.get('fidelity_sensitive') is True
+    appearance_needed = ('appearance_fidelity' in manifest or manifest.get('editing_policy') == 'hybrid'
+                         or (isinstance(inventory, list) and any(isinstance(i, dict) and i.get('appearance_sensitive') is True for i in inventory)))
+    if appearance_needed:
+        audited('appearance_fidelity', lambda: load('appearance_fidelity').audit(
+            artifact, manifest, manifest_path, render_evidence))
+    else:
+        record('appearance_fidelity', 'NOT_APPLICABLE', 'no declared appearance-sensitive items; source inventory and manual review still required', False)
+    sensitive = isinstance(inventory, list) and any(isinstance(item, dict) and (item.get('fidelity_sensitive') is True or item.get('structure_sensitive') is True)
                                                    for item in inventory)
     if 'regional_fidelity' in manifest or sensitive:
         audited('regional_fidelity', lambda: load('component_fidelity').audit_fidelity(

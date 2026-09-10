@@ -1,6 +1,6 @@
 # Reconstruction modes
 
-Select exactly one primary mode for each source composition. A canvas, page, or slide may contain an explicitly disclosed raster exception without changing its primary mode.
+Select exactly one primary mode for each source composition. Editing policy is orthogonal: `native` preserves the established native/evidence workflow; user-approved `hybrid` allows independently replaceable picture components under [hybrid-components.md](hybrid-components.md). Neither a raster exception nor hybrid policy changes the primary mode or permits omission of source content.
 
 ## Faithful reconstruction
 
@@ -9,7 +9,7 @@ Use by default when the user asks to turn a reference into an editable artifact 
 - Match the source canvas, panel arrangement, object positions, relative dimensions, typography hierarchy, colors, line styles, and reading order as closely as practical.
 - Preserve all visible content. Do not translate, simplify, modernize, or rearrange it without authorization.
 - Rebuild ordinary text and redrawable graphical elements with target-native objects.
-- Treat visual comparison against the reference as a required QA step.
+- Treat visual comparison against the reference as a required QA step. A generated component needs explicit component-level approval as an illustrative substitute; disclose that portion as non-exact. Other faithful source regions keep their original checks and tolerances.
 
 ## Semantic editable rebuilding
 

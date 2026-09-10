@@ -693,6 +693,8 @@ def audit_pptx(
     required_texts: list[str] | None = None,
     bounds_tolerance_emu: int = 12700,
     source_inventory: list[dict] | None = None,
+    component_manifest: dict | None = None,
+    manifest_path: Path | None = None,
 ) -> dict[str, object]:
     with zipfile.ZipFile(path) as archive:
         slide_parts, slide_size = slide_parts_in_order(archive)
@@ -762,6 +764,14 @@ def audit_pptx(
         + int(totals["external_resources"])
         + int(totals["broken_internal_resources"])
     )
+    component_report = None
+    if component_manifest and (component_manifest.get('editing_policy') == 'hybrid' or 'component_assets' in component_manifest):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('component_assets', Path(__file__).with_name('component_assets.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        component_report = module.audit(path, component_manifest, manifest_path)
+        blocking_risk_count += len(component_report['errors'])
     totals["blocking_risks"] = blocking_risk_count
     return {
         "input": str(path.resolve()),
@@ -769,6 +779,8 @@ def audit_pptx(
         "picture_area_threshold": picture_area_threshold,
         "bounds_tolerance_emu": bounds_tolerance_emu,
         "totals": totals,
+        "components": component_report,
+        "unverified": component_report.get('unverified', []) if component_report else [],
         "slides": slides,
         "content_integrity": {
             "inventory": inventory_report,
@@ -880,6 +892,8 @@ def main() -> int:
             args.picture_area_threshold,
             required_texts=[*manifest_texts, *args.require_text],
             source_inventory=json.loads(args.manifest.read_text(encoding="utf-8")).get("source_inventory", []) if args.manifest else [],
+            component_manifest=json.loads(args.manifest.read_text(encoding="utf-8")) if args.manifest else None,
+            manifest_path=args.manifest,
             bounds_tolerance_emu=args.bounds_tolerance_emu,
         )
     except (zipfile.BadZipFile, KeyError, ET.ParseError, OSError, ValueError, json.JSONDecodeError) as exc:
@@ -894,7 +908,7 @@ def main() -> int:
         )
         print(f"JSON report: {args.json_path.resolve()}")
 
-    if args.fail_on_risk and report["totals"]["blocking_risks"]:
+    if args.fail_on_risk and (report["totals"]["blocking_risks"] or report.get("unverified")):
         return 1
     return 0
 
