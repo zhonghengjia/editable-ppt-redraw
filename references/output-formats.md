@@ -27,13 +27,9 @@ Choose the target from the user's intended editing surface, fidelity requirement
 
 ## Mature backend reuse
 
-Read [backend-routing.md](backend-routing.md), then use this order:
-
-1. An already installed, trusted skill or editor integration that owns the requested format and can preserve its native objects.
-2. A project-pinned local renderer or CLI whose version-matched documentation is available in the workspace.
-3. Direct local generation of the native source using documented file formats and the bundled validators.
-
-Do not install a renderer, desktop application, plugin, browser package, or system dependency without the authorization required by the current environment. Do not replace a missing editable backend with a hosted conversion service unless the user explicitly authorizes the upload.
+Use [backend-routing.md](backend-routing.md) for qualification and
+[execution-profiles.md](execution-profiles.md) for the bounded attempt policy.
+Format selection does not authorize installation or remote transfer.
 
 ## Format-specific construction notes
 

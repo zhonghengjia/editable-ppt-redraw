@@ -47,11 +47,10 @@ Names are exact, globally unique output names. Cover every source-inventory text
 
 The manifest validator checks selections, numbers and scoped inventory coverage. The quality runner leaves absent clearance for dense text-bearing PPTX `NOT_VERIFIED`. No check silently assumes a source label is absent because it was omitted from a hand-written list. Actual-render review must still check all labels, glyph overflow, path thickness, images and non-selected shapes; the numeric gate does not certify those properties.
 
-## Audit command
+## Verification entrypoint
 
-```text
-python scripts/audit-pptx-editability.py output.pptx --manifest visual-manifest.json --fail-on-risk
-python scripts/audit-typography-hierarchy.py visual-manifest.json output.pptx --fail-on-risk
-```
-
-The editability audit checks required content and native objects; typography checks source-declared role ratios and run anomalies. Text clearance separately checks protected boxes against named native obstacles. Run them through `scripts/run-quality-checks.py` on the final file. Rendering remains required because none of these numerical checks proves that every glyph is unobscured.
+[Quality-runner](quality-runner.md) dispatches actual-object text presence,
+source-declared typography ratios and named-obstacle clearance. Use standalone
+auditors only for diagnosis not already covered on the same inputs. Rendering
+still checks all glyphs, line breaks and visibility; those numerical checks alone
+do not prove every character is unobscured.

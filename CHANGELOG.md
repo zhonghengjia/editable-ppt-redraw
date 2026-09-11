@@ -1,5 +1,98 @@
 # Changes
 
+## 3.16.0 — 2026-09-11 — operation-scoped instructions
+
+- Split tracing, regional/surface evidence, native Paint and native/hybrid component
+  schemas into conditional authorities; retain their fields and numerical limits.
+- Shorten the entrypoint, README and shared execution/review guidance. Remove
+  duplicate standalone-audit sequencing and update callers to the existing runner.
+- Move independent-test source isolation to the shared execution profile, rather
+  than defining a whole-workflow rule inside a surface-detail schema.
+- Add documentation path/anchor and reachability regressions plus UPDATE_GUIDE.md
+  with changed locations, installation/update steps and instruction-size measures.
+- Existing v3.15 drawing code, tests, assets, dependencies and quality thresholds
+  are unchanged. Fixed reading sets measure character reductions, not end-to-end
+  model-token savings or universal redraw-quality equivalence.
+- Keep user visual acceptance distinct from previously incomplete machine evidence.
+  Public publication also includes the preserved local v3.12–v3.15 changes below.
+
+## 3.15.0 — 2026-09-11 — source-paint ownership
+
+- Separate observed ownership from paint in the existing tracing entrypoint.
+  Source-color selection and hash-bound supplied masks retain internal RGB/alpha;
+  uniform silhouette behavior remains explicit and backward compatible.
+- Reuse existing color partitions, budgets, trace evidence and native emitter.
+  Document original-rendered object paint for unsupported PDF blending, including
+  baked-backdrop and non-semantic color-layer editing limitations.
+- No renderer/model installation, new vector engine or whole-image fallback.
+- Separate native PDF lettering in an in-memory artwork render, preserving
+  existing vector/image paint without cover rectangles or source-file writes.
+  Original source remains final-review truth; outlined/raster text is unsupported.
+
+## 3.14.0 — 2026-09-11 — scoped native alpha composition
+
+- Extend the existing component serializer with whole-part/group alpha effects,
+  retaining nested boundaries and overlapping child colors rather than distributing
+  group opacity to leaves. Keep legacy no-effect output and strict source semantics.
+- Add explicit alpha/DeviceGray/DeviceRGB luminosity sample decoding and bounded
+  source-coordinate axis-gradient fitting with quantized stop residuals. Neither
+  helper claims PDF mask extraction, arbitrary spatial conversion or final fidelity.
+- Replace affected schema and appearance-routing statements in place. Raw PDF
+  Multiply/Screen backdrop groups, clipping and arbitrary 2D masks remain unresolved.
+- Verify the canonical API against actual Office 16 alpha-effect probes and
+  saved/reopened rendering. No raster substitution, new dependency or publishing.
+
+## 3.13.1 — 2026-09-10 — shared paint domains and source stroke coverage
+
+- Extend the existing part-tree serializer with explicit group-owned fills and
+  inherited child paint. Reject orphan ownership and unsupported stroke inheritance.
+- Expose that one serializer to target-owning XML adapters, preserving the existing
+  python-pptx entrypoint rather than introducing a second path exporter.
+- Add explicit centered source-radius to Office circumscribed-radius conversion;
+  retain existing Office path-stop semantics.
+- Add optional installed-WPF fill/stroke union with source-unit tolerance for
+  identical paint under a shared mask. No raster fallback, dependency install,
+  arbitrary clipping, hidden geometry or general soft-mask claim.
+- Replace the relevant paint/domain instructions in place and test ownership,
+  nested transforms, radial conversion, coverage and actual Office behavior.
+
+## 3.13.0 — 2026-09-10 — source paint and executable components
+
+- Add local PDF extended-scope/display-list inspection; retain unresolved shading,
+  clips and group state without pretending extraction is native conversion.
+- Compile bounded same-domain Normal/Multiply/Screen solid-over-opaque-paint
+  expressions through the existing native Paint emitter; recursively revalidate
+  sampled input colors and preserve continuous gradient stops.
+- Replace control-hull path extents with analytic cubic bounds and a one-EMU
+  degenerate extent floor. Preserve cubic controls and the existing parser.
+- Add manifest-bound local crop/alpha preparation, known-matte unmixing and
+  premultiplied-alpha diagnostic layer rendering using existing Pillow/NumPy.
+  Re-execute declared preparation during the existing package audit; hashes alone
+  cannot pass a changed component against its source recipe.
+- Add immutable instance-to-asset replacement with shared-asset isolation and a
+  prepare/preview/replace CLI. Preserve the existing actual-PPTX readback checker;
+  replacement bindings do not directly mutate decks or certify semantics.
+- Rework the appearance construction instructions in place. No new runtime,
+  automatic raster fallback, changed QA threshold or arbitrary soft-mask support.
+
+## 3.12.0 — 2026-09-10 — instruction routing and deduplication
+
+- Replaced the long entrypoint with scope defaults, profile-first planning and a
+  feature-to-contract router. Keep faithful/native/PPTX defaults, supported targets,
+  privacy, source preservation and user-authorized hybrid boundaries.
+- Centralized attempt/correction budgets in execution profiles, machine dispatch
+  and evidence status in the runner guide, and rendered acceptance/delivery in the
+  rubric. Individual auditor examples are diagnostic alternatives when already
+  covered, not an extra mandatory run on unchanged inputs.
+- Replaced duplicated manifest grammar/typography/curve schemas with links to their
+  unchanged specialist authorities and one compact base example. Native/hybrid
+  component schemas remain in the manifest.
+- Preserve source observations across correction, but refresh changed artifact
+  readback and hash-bound evidence. No stale PASS reuse or reduced visual coverage.
+- No drawing code, tests, dependencies, assets, numeric limits or fidelity
+  thresholds changed. Instruction-size reductions are not measured end-to-end
+  model-token savings or proof of equal quality on every future source.
+
 ## 3.11.0 — 2026-09-10 — source paint composition and construction preflight
 
 - Added explicitly planned opaque color-tree composition to the existing palette boundary pipeline. Tree masks stay inside source-visible support; transparent holes, quantized visible colors and existing budgets remain invariant. No output-derived filler, stroke inflation, new renderer or model.

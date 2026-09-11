@@ -1,7 +1,7 @@
 # Independent image components with native editable structure
 
 Read when the user accepts movable/scalable/replaceable raster illustration
-components. Authoritative fields live in [visual-manifest.md](visual-manifest.md),
+components. Authoritative fields live in [hybrid-component-schema](hybrid-component-schema.md),
 not a second asset ledger. Preserve the default native route and existing source
 trace limits. Do not switch to hybrid merely because native reconstruction fails.
 
@@ -18,13 +18,44 @@ scientific evidence.
 Prefer a suitable original object, approved local asset or licensed asset before
 generation when object-level picture editing is the accepted scope. When individual
 inner parts matter, use source-grounded native part trees and Paint under
-[native-toolkit.md](native-toolkit.md) rather than generating the entire assembly
+[native-paint](native-paint.md) rather than generating the entire assembly
 as one image. A cell cluster, device assembly or branching surface is not one
 editing unit merely because it fits in a small box. Whole-object generation is
 appropriate only when its internal editability and illustrative substitution are
 explicitly accepted; its geometry/appearance requirements are still not guaranteed
 by prompt text. Record each asset's own license/attribution: repository code licensing
 does not license artwork or model weights. No external model stack is required.
+
+## Local component construction
+
+For an approved source object with existing or independently qualified alpha, use
+`scripts/raster_components.py` and the asset's optional `preparation` contract in
+[hybrid-component-schema](hybrid-component-schema.md). This is a Pillow/NumPy processing route,
+not automatic semantic segmentation or vectorization. It preserves supplied
+texture/alpha; known-matte unmixing can remove edge color contamination. Do not
+infer unknown masks/mattes, fill transparent holes or use this as a failed-native
+fallback. The crop must be an accepted editing unit, not an arbitrary panel tile.
+
+```text
+python scripts/raster_components.py prepare --manifest plan.json --asset-id cell --out-manifest prepared.json
+python scripts/raster_components.py preview --manifest prepared.json --order cell other-object --canvas-inches 10 6 --background 255 255 255 --output light.png
+python scripts/raster_components.py preview --manifest prepared.json --order cell other-object --canvas-inches 10 6 --background 24 28 36 --output dark.png
+```
+
+Use actual IDs, not these illustrative names. Preparation reads the original,
+writes a new PNG at the asset's planned path and a new sibling manifest, and
+never overwrites files. The Python `prepare_asset` API returns bytes, copied
+manifest and diagnostics without writing. Inputs are capped at 16 million pixels,
+prepared crops at 4 million. Unknown ICC/orientation, frame/mode, source hash,
+alpha size or incompatible matte fail explicitly. These are processing limits,
+not quality thresholds; no automatic downsampling relaxes them.
+
+Preview uses existing instance placements, explicit back-to-front instance order
+and premultiplied-alpha resampling (1..600 DPI; 16 million output pixels). It is
+only a **partial component preview**: native labels/paths/links are absent. It
+rejects rotation, crop, distortion and off-canvas placements; use the selected
+target renderer for those. Inspect light/dark views for halos, damaged branches,
+holes and occlusion; do not substitute this diagnostic for final-slide rendering.
 
 ## Built-in generation route
 
@@ -73,8 +104,19 @@ exposes a documented canonical document model, assign stable names there before
 export and resolve actual native IDs afterward. Do not repair missing identity only
 in the delivered ZIP or pretend an empty name is a unique component selector.
 
-Replacement changes canonical asset/instance inputs and regenerates the deck.
-Preserve instance name, identity, placement, crop and planned anchors. Re-run the
+Replacement uses `raster_components.replace_instance_asset(manifest, instance_id,
+new_asset, base)` or the CLI below. Supply the complete approved new asset record
+with fresh asset ID/provenance/hash. It returns a copied canonical manifest,
+changes only the selected binding, preserves shared users and instance geometry/
+anchors, and rejects changed image aspect ratio. No old image files are deleted.
+
+```text
+python scripts/raster_components.py replace --manifest prepared.json --instance-id cell-01 --asset-record replacement-asset.json --out-manifest replacement-ready.json
+```
+
+The command does not modify PPTX. Regenerate through the same canonical builder,
+preserving names, shape identity, alt text, placement, crop and anchors; do not let
+the new filename silently change non-media properties. Re-run the
 package audit and `component_assets.verify_replacement(before, after, slide, name,
 expected_sha256)` on actual files. This read-only helper compares unrelated object
 XML/media, target identity and geometry. Media relationship IDs resolve to their

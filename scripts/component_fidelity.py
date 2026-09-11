@@ -154,7 +154,47 @@ def recipe_digest(value):
                                      ensure_ascii=False, allow_nan=False).encode('utf-8')).hexdigest()
 
 
-def prepare_support(cropped, selector, ownership, source_hash, crop):
+def retain_source_paint(cropped, mask):
+    """Keep observed RGBA inside ownership; no alpha averaging or matte removal."""
+    import numpy as np
+    from PIL import Image
+    values = np.array(cropped.convert('RGBA'))
+    mask = np.asarray(mask)
+    if mask.dtype != np.bool_ or mask.shape != values.shape[:2] or not mask.any():
+        raise ValueError('source ownership must be a nonempty crop-sized Boolean mask')
+    values[~mask] = 0
+    return Image.fromarray(values)
+
+
+def supplied_support(cropped, spec):
+    """Read independently observed visible ownership, not a recovered soft mask."""
+    import numpy as np
+    from PIL import Image
+    if not isinstance(spec, dict) or set(spec) != {'path','sha256','observation'}:
+        raise ValueError('source support requires path, sha256 and observation')
+    if not isinstance(spec['observation'], str) or not spec['observation'].strip():
+        raise ValueError('source support observation required')
+    if digest(spec['path']) != spec['sha256']:
+        raise ValueError('source support hash mismatch')
+    with Image.open(spec['path']) as image:
+        if image.mode not in ('1','L') or image.size != cropped.size:
+            raise ValueError('source support must be crop-sized binary grayscale')
+        if getattr(image, 'n_frames', 1) != 1:
+            raise ValueError('source support must be single-frame')
+        values = np.asarray(image.convert('L'))
+    if np.any((values != 0) & (values != 255)):
+        raise ValueError('visible ownership is binary, not an alpha threshold')
+    mask = values == 255
+    result = retain_source_paint(cropped, mask)
+    return result, dict(source_support=spec,
+        mask_sha256=hashlib.sha256(mask.tobytes()).hexdigest(),
+        representation='source_rgba_with_observed_ownership',
+        paint_preserved_before_quantization=True,
+        limitations=['Rendered backdrop remains baked into observed colors',
+                     'Mask asserts visible ownership, not hidden anatomy or text separation'])
+
+
+def prepare_support(cropped, selector, ownership, source_hash, crop, paint='uniform'):
     """One source-only extraction stage; representation and output QA are separate."""
     import numpy as np
     from PIL import Image
@@ -163,10 +203,17 @@ def prepare_support(cropped, selector, ownership, source_hash, crop):
         raise ValueError('selector must isolate nonempty visible support from background; review the source crop')
     selection = dict(selector=selector, selector_sha256=recipe_digest(selector),
                      input_mask_sha256=hashlib.sha256(mask.tobytes()).hexdigest())
+    if paint not in ('uniform','source'):
+        raise ValueError('support paint must be uniform or source')
     if ownership is not None:
         mask, evidence = geometry.owned_support(mask, ownership, source_hash, crop, selection['selector_sha256'])
         evidence['recipe_sha256'] = recipe_digest(ownership)
         selection['ownership'] = evidence
+    if paint == 'source':
+        selection.update(mask_sha256=hashlib.sha256(mask.tobytes()).hexdigest(),
+                         representation='source_rgba_with_observed_ownership',
+                         paint_preserved_before_quantization=True)
+        return retain_source_paint(cropped, mask), selection
     visible = Image.alpha_composite(Image.new('RGBA',cropped.size,'white'),cropped)
     fill = np.median(np.asarray(visible)[:,:,:3][mask],axis=0).astype('uint8').tolist()
     pixels = np.zeros((cropped.height,cropped.width,4),dtype='uint8')
@@ -239,7 +286,8 @@ def normalized_trace_svg(result, representation):
 
 
 def trace_component(source, output, crop, colors=16, node=None, selector=None,
-                    ownership=None, representation=None, part_plan=None):
+                    ownership=None, representation=None, part_plan=None,
+                    support_paint='uniform', source_support=None):
     source, output = Path(source), Path(output)
     sidecar = output.with_suffix('.trace.json')
     failure = output.with_suffix('.trace.failed.json')
@@ -255,19 +303,32 @@ def trace_component(source, output, crop, colors=16, node=None, selector=None,
         raise ValueError('colors must be 2..64')
     if ownership is not None and selector is None:
         raise ValueError('ownership requires a source selector')
+    if support_paint not in ('uniform','source'):
+        raise ValueError('support paint must be uniform or source')
+    if source_support is not None and (selector is not None or ownership is not None):
+        raise ValueError('choose one source ownership method')
+    painted_support = source_support is not None or (selector is not None and support_paint == 'source')
+    if painted_support and part_plan is None:
+        raise ValueError('source-paint support requires a source-bound part plan')
+    if support_paint == 'source' and selector is None and source_support is None:
+        raise ValueError('source support paint requires explicit ownership')
     if representation is None:
-        representation = 'source_edges' if selector is not None else 'smooth'
+        representation = 'source_edges' if selector is not None and not painted_support else 'smooth'
     if representation not in ('source_edges','smooth','palette_edges','palette_stack') or (representation == 'source_edges' and selector is None):
         raise ValueError('representation must be smooth, source_edges with a selector, or palette_edges/palette_stack with a part plan')
-    if representation in ('palette_edges','palette_stack') and (selector is not None or ownership is not None or part_plan is None):
-        raise ValueError('palette representations require a source-bound part plan and no support selector/ownership')
+    if representation == 'source_edges' and painted_support:
+        raise ValueError('source_edges is silhouette-only; use a color representation for source paint')
+    if representation in ('palette_edges','palette_stack') and (part_plan is None or (selector is not None and not painted_support)):
+        raise ValueError('palette representations require a part plan and source-paint ownership, not uniform support')
     source_hash = digest(source)
     if part_plan is not None:
         validate_part_plan(part_plan, source_hash, crop)
     cropped = image.crop((x,y,x+w,y+h))
     selection = None
     if selector is not None:
-        cropped, selection = prepare_support(cropped, selector, ownership, source_hash, crop)
+        cropped, selection = prepare_support(cropped, selector, ownership, source_hash, crop, support_paint)
+    elif source_support is not None:
+        cropped, selection = supplied_support(cropped, source_support)
     quantization = None
     if representation in ('palette_edges','palette_stack'):
         if representation == 'palette_stack' and any(cropped.getchannel('A').histogram()[1:255]):
@@ -331,7 +392,7 @@ def trace_component(source, output, crop, colors=16, node=None, selector=None,
         record.update(part_plan=part_plan, part_plan_sha256=recipe_digest(part_plan))
     if selection is not None:
         record['selection'] = selection
-        record['geometry_basis'] = 'source_visible_support_selector'
+        record['geometry_basis'] = 'source_visible_ownership_and_paint' if painted_support else 'source_visible_support_selector'
     else:
         record['limitations'].append('Crop background and unwanted source text remain present in color regions')
     fresh_json(sidecar, record)
@@ -432,6 +493,8 @@ def main():
     trace.add_argument('--ownership', type=Path, help='source-bound connected-part witnesses JSON; unassigned support is recorded')
     trace.add_argument('--representation', choices=('smooth','source_edges','palette_edges','palette_stack'), help='default: source_edges for selected support; smooth for ordinary color crops')
     trace.add_argument('--part-plan', type=Path, help='source-bound part identity and predeclared native edit budget; required for palette_edges/palette_stack')
+    trace.add_argument('--support-paint', choices=('uniform','source'), default='uniform', help='uniform silhouette or retain observed RGBA inside selector; source requires part plan')
+    trace.add_argument('--source-support', type=Path, help='JSON with crop-sized binary mask path, sha256 and source observation; mask path relative to this JSON')
     audit = sub.add_parser('audit')
     audit.add_argument('artifact', type=Path)
     audit.add_argument('--manifest', type=Path, required=True)
@@ -444,8 +507,11 @@ def main():
             selector = json.loads(args.selector.read_text(encoding='utf-8')) if args.selector else None
             ownership = json.loads(args.ownership.read_text(encoding='utf-8')) if args.ownership else None
             part_plan = json.loads(args.part_plan.read_text(encoding='utf-8')) if args.part_plan else None
+            source_support = json.loads(args.source_support.read_text(encoding='utf-8')) if args.source_support else None
+            if source_support is not None:
+                source_support['path'] = str((args.source_support.parent/source_support['path']).resolve())
             result = trace_component(args.source, args.output, args.crop, args.colors, args.node, selector,
-                                     ownership, args.representation, part_plan)
+                                     ownership, args.representation, part_plan, args.support_paint, source_support)
         else:
             if args.json.exists():
                 raise ValueError('choose a new report path')

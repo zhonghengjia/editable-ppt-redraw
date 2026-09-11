@@ -36,9 +36,36 @@ and new generation/readback/review evidence.
 ## Source observations into executable color
 
 First identify the visible part and choose its contour/local coordinates using
-[component-fidelity.md](component-fidelity.md). Then decide the fill type and
-direction from the source. Keep semantic color variation separate from illumination;
-do not apply the same light direction, cell template or depth order to every object.
+[component-fidelity.md](component-fidelity.md). For PDF sources with layered paint,
+use the [native toolkit's source-state extraction](native-toolkit.md#pdf-source-state)
+before interpreting individual fills. The source record must retain parent clips,
+group opacity/blend mode and non-path operations. A leaf alpha of 1 is not evidence
+of opaque final appearance, and a control-point hull is not the visible curve box.
+
+Classify the required paint as a source-flat fill, an explicit native gradient,
+a supported same-domain composite, scoped native alpha effect, or unresolved source shading. Use the toolkit's
+composite expression for its supported affine color operations; it preserves a
+continuous backdrop instead of replacing the result with a sampled flat band.
+The color expression does not solve masks or group effects. For whole-part/group
+opacity and qualified alpha fields, use the toolkit's
+[compositing scope](native-paint.md#compositing-scope-and-source-alpha-fields),
+keeping source-over effects distinct from PDF non-isolated backdrop blending. For
+qualified centered radial paint, shared group domains and identical fill/stroke
+coverage, use the bounded conversions in [native-toolkit](native-toolkit.md).
+Unsupported native effects can use the explicitly selected source-paint ownership
+route in [source-tracing](source-tracing.md): render original composition
+first, retain object-only support, then reuse bounded native color tracing. This
+preserves visible color variation approximately, not live PDF blend semantics;
+do not feed these composited colors back through the original blend a second time.
+Keep geometry and paint coordinates together: cropping a shape does not
+automatically rebase its original gradient. Do not distribute a group alpha
+across overlapping children or infer mask absence from an image list.
+
+Only then choose fill parameters or independent source patches. Keep semantic
+color variation separate from illumination; do not apply the same light direction,
+cell template or depth order to every object. Sampling below estimates colors,
+not spatial alpha or the gradient's radius/coordinate domain. If those remain
+unresolved, retain that limitation rather than assigning plausible stops.
 
 `appearance_fidelity.sample_paint(source_path, recipe)` reads independently chosen
 source patches into actual `native_paint` colors. It does not edit the source or
@@ -70,8 +97,11 @@ lighting. Existing matting is a separately authorized optional route, not a sile
 fallback. Manually chosen colors require source/approval evidence in part observations
 and must not be mislabeled as sampled colors.
 
-`native_components.add_manifest_component` re-reads declared patches and refuses
-stale or manually altered sampled colors before output. Changing a source-bound
+`native_components.add_manifest_component` re-reads declared patches, including
+leaves of composite expressions, and refuses stale or manually altered sampled
+colors before output. Derived composite colors retain their input recipes in the
+canonical expression, not a false claim that the output colors were sampled.
+Changing a source-bound
 paint means changing its canonical source recipe with a justified observation and
 regenerating, not overwriting stops to pass a comparison. This association check is
 not full-image fidelity: final rendering can interpolate or antialias differently.
@@ -169,7 +199,7 @@ compliance. Permissions, references and the shared two-attempt budget still appl
 ## Final-artifact evidence and decision
 
 Use the existing `--render-evidence` file, with `slide: 1`, source/final-file/render
-hashes and renderer assertion under [component-fidelity.md](component-fidelity.md).
+hashes and renderer assertion under [regional-fidelity](regional-fidelity.md).
 Do not create a second competing artifact ledger. Add `appearance_review`:
 
 ```json

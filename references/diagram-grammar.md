@@ -102,9 +102,10 @@ The report separates name/geometry `valid` from endpoint `status`. Missing endpo
 
 ## Required QA
 
-1. Validate the manifest with `scripts/validate-visual-manifest.py`.
-2. Reopen or reparse the actual output and export layout or source inspection data.
-3. Run `scripts/audit-diagram-grammar.py <manifest> <layout-json-or-dir> --fail-on-risk`.
-4. Run the target-specific routing, editability, text, and rendering audits required by the selected execution profile.
+Validate the manifest before construction. Reopen the actual output and export
+layout/source inspection data, then use [quality-runner](quality-runner.md) for
+grammar and other applicable checks. The standalone
+`scripts/audit-diagram-grammar.py <manifest> <layout-json-or-dir> --fail-on-risk`
+is a diagnostic alternative, not another pass over unchanged evidence.
 
 Block delivery when a role object is missing, a named object uses a disallowed geometry, a semantic connection has no matching output line, or the diagram family changed without recorded explicit authorization.

@@ -6,7 +6,7 @@ Source: [JamieJustTang/svg2pptx-skill](https://github.com/JamieJustTang/svg2pptx
 
 Upstream file: `scripts/svg_to_pptx/drawingml_paths.py`. Destination: `scripts/vendor/svg_paths/drawingml_paths.py`. The upstream MIT license, including attribution to Jamie Tang and Hugo He/ppt-master and its asset notices, is retained in `scripts/vendor/svg_paths/LICENSE`.
 
-Modifications: strict rejection of malformed/incomplete/nonfinite paths and invalid arc flags/radii; reset the current point to the subpath origin after closepath during normalization. `drawingml_utils.py` is a minimal original pixel/EMU adapter, not the upstream utilities. No upstream CLI, model pipeline, rasterizer or entire converter was bundled.
+Modifications: strict rejection of malformed/incomplete/nonfinite paths and invalid arc flags/radii; reset the current point to the subpath origin after closepath during normalization; compute cubic-extrema bounds analytically instead of using the control-point hull, with a one-EMU minimum extent. `drawingml_utils.py` is a minimal original pixel/EMU adapter, not the upstream utilities. No upstream CLI, model pipeline, rasterizer or entire converter was bundled.
 
 ## Lucide assets
 
@@ -29,8 +29,18 @@ The toolkit calls already available python-pptx, lxml, Pillow and optional NumPy
 ## Native Paint and component construction
 
 `native_paint.py`, `native_components.py` and the source sampling functions are
-original integration code. They reuse the already bundled path mathematics and
+original integration code. The bounded composite compiler independently implements
+the [W3C compositing equations](https://www.w3.org/TR/compositing-1/); no reviewed
+converter or renderer implementation was copied. `pdf_paint_scene.py` uses an
+already installed PyMuPDF public API as an optional read-only source adapter;
+PyMuPDF/MuPDF keep their separately distributed licenses, and their source is not
+vendored. These helpers reuse the already bundled path mathematics and
 native DrawingML fill semantics rather than copying diffusion/matting code.
+`raster_components.py` is original Pillow/NumPy integration for given-alpha crop
+processing, known-matte algebra, diagnostic compositing and immutable bindings.
+No Canva artwork, private model, SDK or demonstration asset is bundled. Public
+Canva demonstrations informed the object-level workflow, not a claim to reproduce
+their unpublished segmentation or generative backend.
 The bounded fill representation follows Microsoft's [GradientFill](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.gradientfill)
 and [PathGradientFill](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.pathgradientfill)
 documentation. The [PowerPoint gradient-stop interface](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.fillformat.gradientstops)
@@ -42,6 +52,13 @@ Bioicons artwork and Blender assets are not newly included. Review of a reposito
 is not adoption of its license or a claim that its runtime was tested here.
 
 ## Marked-source shared coverage
+
+Source-paint ownership in `component_fidelity.py` also reuses this tracing engine.
+The new ownership integration is original code. Research inspected MuPDF/PDF.js
+group compositing, resvg mask/group rendering, Sharp premultiplied-alpha handling
+and SVG-to-DrawingML projects; no code from these reviews is newly vendored.
+Source rendering uses an already installed renderer under its existing license.
+Reviewing AGPL/LGPL projects does not authorize redistributing their implementations.
 
 `source_partition.py` and the coverage diagnostics in `component_geometry.py`
 are original integration code. The marker-controlled priority flood is not an

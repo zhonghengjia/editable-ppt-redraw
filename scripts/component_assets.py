@@ -154,6 +154,8 @@ def _validate_contract(manifest):
             crop = asset.get('source_bbox')
             if not hash_string(asset.get('source_sha256')) or not vector(crop, 4) or min(crop[:2]) < 0 or min(crop[2:]) <= 0:
                 errors.append(f'{aid}: source hash and source pixel bbox required')
+        if 'preparation' in asset:
+            errors.extend(f'{aid}: {e}' for e in load('raster_components').validate_preparation(asset))
         if kind == 'generated':
             errors.extend(f'{aid}: {e}' for e in generation_preflight(asset.get('generation'), manifest=manifest)['errors'])
             if asset.get('content_class') != 'illustration' or asset.get('comparison') != 'approved_surrogate':
@@ -392,6 +394,8 @@ def audit(artifact, manifest, manifest_path=None):
                         x,y,w,h=a['source_bbox']
                         if x+w > src.width or y+h > src.height:
                             errors.append(f'{aid}: declared crop exceeds source pixels')
+                if 'preparation' in a:
+                    load('raster_components').verify_preparation(manifest, aid, base, blob)
                 if a['source_kind'] == 'generated':
                     for ref in a['generation']['references']:
                         if sha((base/ref['path']).read_bytes()) != ref['sha256']:

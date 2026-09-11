@@ -1,42 +1,84 @@
 # Applicable local checks and evidence status
 
-Use one runner on each final editable artifact. It invokes the existing local auditors; it does not launch a model, renderer, Office instance, network service or installer.
+This is the machine-check entrypoint and status authority. The runner uses existing
+local auditors; it launches no model, renderer, Office instance, service or installer.
 
 ```text
 python scripts/run-quality-checks.py output.pptx \
   --manifest visual-manifest.json --layout reopened.layout.json \
-  --expected-connections connections.json --json quality-report.json --fail-on-risk
+  --expected-connections connections.json --render-evidence render-evidence.json \
+  --node /path/to/existing/node --json quality-report.json --fail-on-risk
 ```
 
-Only the artifact is mandatory. Omit unused optional inputs. `--profile fast|standard|dense` overrides profile selection; otherwise the manifest profile or `standard` applies. Dense work requires a manifest. Fast/standard work may use working notes, but the report then cannot assert undeclared inventory, curve or typography coverage. Profile selection cannot disable a contract already present in the manifest.
+Only the artifact is mandatory; omit unused options. `--profile fast|standard|dense`
+overrides the manifest profile (otherwise `standard`). Select the truthful profile
+under [execution-profiles](execution-profiles.md); no override disables declared
+contracts. Working notes cannot establish undeclared machine inventory coverage.
 
 ## Status contract
 
 | Status | Meaning |
 |---|---|
-| `PASS` | The named machine check ran with its required evidence and found no blocking issue within its documented scope. |
-| `FAIL` | The check found a violation or an invalid input. |
-| `NOT_APPLICABLE` | This check does not apply to the selected format or declared features. It does not prove the feature is absent from the image. |
-| `NOT_VERIFIED` | Applicable evidence is missing, unsupported or unreadable; an exception is preserved as a reason, never silently skipped. |
+| `PASS` | The named check ran with required evidence and found no blocking violation within its scope. |
+| `FAIL` | Detected violation or invalid input. |
+| `NOT_APPLICABLE` | Outside target/declared features; not proof the feature is absent from the source. |
+| `NOT_VERIFIED` | Applicable evidence missing, unreadable or unsupported; exceptions retain reasons. |
 
-`automation_passed` requires every applicable machine check to be `PASS` or `NOT_APPLICABLE`. With `--fail-on-risk`, failure or missing required evidence returns nonzero. `delivery_ready` is intentionally null: no machine flag certifies visual review. The final agent separately records the rendered pages/crops inspected, source inventory coverage and unresolved limitations. Do not invent a visual sign-off to change the runner's result.
+`automation_passed` requires all checks marked `required_for_automation` to be
+PASS or NOT_APPLICABLE. `--fail-on-risk` returns nonzero otherwise.
+`delivery_ready` stays null: the runner never certifies visual review.
+Legacy auditor `valid`/`ok` may describe detected errors only; use completeness
+fields, the runner or `--fail-on-risk`, never `valid: true` alone.
 
-Some individual auditors retain legacy `valid`/`ok` fields describing detected errors only. Their `unverified` or `status` fields control completeness. Use the runner or the auditor's `--fail-on-risk`, not just `valid: true`, to decide whether a declared automated gate is complete.
+## Dispatch and inputs
 
-## Applicability and provenance
+This table describes `scripts/run-quality-checks.py`; do not execute covered
+auditors a second time on unchanged inputs merely because a reference shows their CLI.
 
-- All supported artifacts receive the target editability/source check. Unknown formats remain unverified.
-- A supplied manifest receives schema validation, including the optional executable `native_components` tree. This validates inputs, not arbitrary semantic constraints or gradient fidelity. Construction uses [native-toolkit.md](native-toolkit.md); an emitted gradient and correctly nested XML still require real-file rendering and editing qualification.
-- Declared grammar uses reopened layout; typography uses actual PPTX runs or resolved layout; curves use native PPTX custom paths. Unsupported target/feature combinations remain unverified.
-- Native PPTX connectors receive binding inspection. `--expected-connections` adds source/target and arrow expectations according to [native-toolkit.md](native-toolkit.md). Unsupported geometry is not a pass.
-- Orthogonal routes require native geometry evidence or the named-segment layout audit. Line-name screening alone cannot certify route meaning or obstacle avoidance.
-- Reopened layout documents must include `artifact_sha256` matching the final editable artifact to associate the inspection with that exact file. Compute it after saving and reopening; never attach a current hash to stale builder-side geometry. The hash establishes association, not authenticity or rendered accuracy.
-- Mermaid/Graphviz lexical screening is not native parsing. Record a separate successful run of the installed format-owning parser/renderer before delivering; the generic runner leaves that parser check unverified because it does not launch external tools.
-- `regional_fidelity`, `fidelity_sensitive` or `structure_sensitive` invokes the same regional auditor, even when only the structural flag is present. It uses `--render-evidence` and an existing local `--node` under [component-fidelity.md](component-fidelity.md). Missing evidence is unverified; hash/coordinate disagreement or excessive regional differences fail. Within that same contract, `structure_sensitive` requires source-frozen visible-support checks, and assembly `structure.coverage` localizes introduced voids and filled source holes rather than comparing only counts. Open cracks remain missing-support regions. Structural/coverage PASS never overrides color FAIL; missing NumPy or complexity limits stay unverified, empty support is invalid. Preparation labels and opaque paint-tree coverage are not final-render masks or proof of semantic identity. Do not omit a required sensitive declaration to report its check as not applicable.
-- Declared `surface_relations` or `surface_detail` inventory invokes the native host/detail auditor under [component-fidelity.md](component-fidelity.md). Missing ownership contracts fail; unsupported geometry/targets remain unverified. Source boundary landmarks, sampled containment and paint order are distinct from rendered attachment, opacity and visual meaning.
-- `appearance_fidelity`, appearance-sensitive inventory or hybrid policy invokes the shared [appearance audit](appearance-fidelity.md) with `--render-evidence`. It reports source-relative RGB/display-luma probes, actual native/mixed paint order and hash-bound reviewer records separately. Legacy hybrid manifests missing this contract remain NOT_VERIFIED. Current appearance render evidence is scoped to slide 1; other slides/scopes need separate visual review and must not inherit its result. Invariant substitutes cannot use source-exact numeric probes. A record PASS validates evidence completeness within scope, not a model's perception, reviewer authenticity or biological correctness; overall visual review stays separate.
-- Declared `text_clearance` checks actual PPTX label boxes against selected native arrow/path geometry and other labels, under [text-fidelity.md](text-fidelity.md). Dense text-bearing PPTX without that contract remains unverified. This is distinct from text presence, font-size ratios and glyph visibility; unsupported geometry is not a pass.
-- Hybrid manifests route asset/instance readback through the existing PPTX editability check: embedded/local hashes, picture registration, native-role coverage, recursive transforms, crop, effective DPI, visible subject dimensions and planned anchors. Unsupported geometry/inherited media is unverified; invalid provenance or destructive crop fails. See [hybrid-components.md](hybrid-components.md). Other formats do not yet have this component package check.
-- Icon recognition, edge color-fringing, arbitrary semantic/negative constraints, exact glyph bounds, fine curve detail and actual editor behavior remain feature-specific checks under [quality-rubric.md](quality-rubric.md). Hybrid component visual review stays separate and unverified in the automated summary. Hashes and declared roles cannot authenticate scientific semantics or prove that pictures contain no undeclared content. Source-versus-render inspection remains mandatory.
+| Trigger | Runner check and required evidence | Scope authority |
+|---|---|---|
+| Every artifact | Read/hash and target editability; PPTX package or supported editable-source auditor. Unknown format unverified. | [output-formats](output-formats.md) |
+| Supplied manifest | Schema, inventory and declared extension validation, including optional native component trees. Dense without manifest unverified. | [visual-manifest](visual-manifest.md) |
+| `diagram_grammar` | Roles and directed endpoints from reopened layout | [diagram-grammar](diagram-grammar.md) |
+| `typography_hierarchy` | Actual PPTX runs or resolved per-run layout | [typography-hierarchy](typography-hierarchy.md) |
+| `curve_fidelity` | Actual native PPTX custom paths; other targets unverified | [curve-fidelity](curve-fidelity.md) |
+| Every PPTX | Native binding inspection; optional `--expected-connections` adds source/target and arrow expectations | [native-toolkit](native-toolkit.md) |
+| Orthogonal grammar, incomplete native geometry | Named-segment audit on reopened layout | [connector-geometry](connector-geometry.md) |
+| `regional_fidelity`, `fidelity_sensitive` or `structure_sensitive` | Original source vs final render via `--render-evidence` and existing Node. Structural-only declarations invoke the same auditor. | [regional-fidelity](regional-fidelity.md) |
+| `surface_relations` or `surface_detail` | Native host/detail landmarks, containment and paint order | [component-fidelity](component-fidelity.md) |
+| `appearance_fidelity`, `appearance_sensitive` or hybrid policy | Source color/tone probes, native/mixed paint order, hash-bound reviewer records via `--render-evidence` | [appearance-fidelity](appearance-fidelity.md) |
+| `text_clearance` | Native PPTX label/path boxes. Missing contract for dense text-bearing PPTX unverified. | [text-fidelity](text-fidelity.md) |
+| Hybrid policy | Asset/instance package readback within PPTX editability: bytes, names, native roles, transforms, crop, visible resolution and anchors. Other targets unverified. | [hybrid-components](hybrid-components.md) |
 
-Retain the JSON report, artifact hash, canonical builder/manifest and task-relative trace evidence with working QA material. Do not put private source paths, temporary diagnostics or raw extraction logs on the slide. A corrected artifact needs new readback evidence and a fresh report; it cannot inherit the previous artifact's pass.
+Feature contracts retain their exact failure, applicability and unsupported-geometry
+boundaries. In particular: structural coverage cannot override color failure;
+preparation masks/paint trees do not certify final rendering; native paint order
+does not prove visible attachment; legacy hybrid work without appearance evidence
+is unverified. Current appearance render evidence covers slide 1 only. Scope
+multi-slide/source comparisons separately; never inherit a result for unaudited pages.
+Do not omit difficult source items or sensitive declarations to get NOT_APPLICABLE.
+
+## Fresh artifact evidence
+
+- Each reopened layout document includes `artifact_sha256` matching the final
+  artifact. Measure after saving/reopening, not from builder-side geometry.
+- Render evidence binds artifact, source and actual rendered bytes under the
+  [regional evidence contract](regional-fidelity.md). Hashes associate files; they do not
+  authenticate rendering history, scientific semantics or reviewer identity.
+- Changed artifacts require fresh readback/evidence and a new runner report.
+  Never attach a new hash to stale geometry, images or review assertions.
+- Keep reports, source traces, contracts and hashes with working QA material,
+  not as private paths or extraction logs inside the visual.
+
+## Checks outside the runner
+
+The runner does not perform source inspection, OCR, rendering, editor interaction,
+general visual approval, standalone asset extraction checks or arbitrary
+semantic/negative constraints. Use [quality-rubric](quality-rubric.md) for these
+obligations; a machine PASS does not waive them.
+
+For Mermaid/Graphviz, lexical screening is not native parsing: run the installed
+format-owning parser/renderer separately and record its result. The runner's
+unverified parser result is not rewritten to imply it launched that tool.
+Generation preflight and component replacement comparison remain operation-specific
+under [hybrid-components](hybrid-components.md), not repeated default work.

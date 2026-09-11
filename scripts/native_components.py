@@ -1,7 +1,7 @@
 """Executable manifest part trees using the existing native path serializer.
 
 This constructs supplied geometry, not semantic segmentation or hidden anatomy.
-No network, image generation, masking or environment installation is performed.
+No network, image generation, source-mask extraction or installation is performed.
 """
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ import math
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
-from native_paint import keys, normalize_paint, scalar
+from native_paint import (keys, normalize_paint, scalar, sampled_paints, paint_xml,
+                          normalize_compositing, compositing_xml)
 from native_vectors import (A_NS, P_NS, MAX_SVG_ELEMENTS, MAX_PATH_CHARS,
                             PathCommand, parse_svg_path, svg_path_to_absolute,
                             normalize_path_commands, path_shape_xml, parse_xml)
@@ -37,7 +38,7 @@ def prepare_component(component):
         raise ValueError('viewbox dimensions must be positive')
     seen, names, total = set(), {name}, 0
 
-    def visit(nodes, parent_name, tx, ty, scale, depth):
+    def visit(nodes, parent_name, tx, ty, scale, depth, owns_paint=False):
         nonlocal total
         if depth > 16 or not isinstance(nodes, list) or not nodes:
             raise ValueError('nonempty parts/children required, maximum depth 16')
@@ -46,9 +47,9 @@ def prepare_component(component):
             total += 1
             if total >= MAX_SVG_ELEMENTS:
                 raise ValueError('component exceeds native element budget')
-            common = {'id', 'role', 'observation', 'translate', 'scale'}
+            common = {'id', 'role', 'observation', 'translate', 'scale', 'compositing'}
             group = isinstance(node, dict) and 'children' in node
-            allowed = common | ({'children'} if group else {'d', 'fill', 'stroke', 'stroke_width'})
+            allowed = common | ({'children', 'group_fill'} if group else {'d', 'fill', 'stroke', 'stroke_width'})
             keys(node, allowed, {'id', 'role', 'observation'} | ({'children'} if group else {'d', 'fill'}), 'part')
             part_id = label(node['id'], 'part id')
             if '/' in part_id or part_id in seen:
@@ -65,9 +66,17 @@ def prepare_component(component):
             nx, ny, ns = tx + dx*scale, ty + dy*scale, scale*local_scale
             if not all(math.isfinite(v) and abs(v) <= 1e9 for v in (nx, ny, ns)) or ns <= 0:
                 raise ValueError('composed transform exceeds profile')
-            entry = {'id': part_id, 'name': output_name, 'role': node['role']}
+            entry = {'id': part_id, 'name': output_name, 'role': node['role'],
+                     'compositing': normalize_compositing(node.get('compositing'))}
             if group:
-                entry['children'] = visit(node['children'], output_name, nx, ny, ns, depth+1)
+                own_fill = node.get('group_fill')
+                if 'group_fill' in node:
+                    own_fill = normalize_paint(own_fill)
+                    if own_fill['kind'] in ('none', 'group'):
+                        raise ValueError('group_fill must define its own concrete paint')
+                entry['group_fill'] = own_fill if own_fill is not None else ({'kind':'group'} if owns_paint else None)
+                entry['children'] = visit(node['children'], output_name, nx, ny, ns, depth+1,
+                                          owns_paint or own_fill is not None)
             else:
                 path = node['d']
                 if not isinstance(path, str) or not path.strip() or len(path) > MAX_PATH_CHARS:
@@ -80,6 +89,8 @@ def prepare_component(component):
                         raise ValueError('transformed path exceeds coordinate budget')
                     transformed.append(PathCommand(cmd.cmd, args))
                 fill = normalize_paint(node['fill'])
+                if fill['kind'] == 'group' and not owns_paint:
+                    raise ValueError('group fill requires an explicit ancestor paint owner')
                 stroke = normalize_paint(node.get('stroke'))
                 if stroke['kind'] not in ('none', 'solid'):
                     raise ValueError('gradient strokes are outside this profile')
@@ -118,19 +129,25 @@ def validate_contract(manifest):
         return ['native_components: ' + str(exc)]
 
 
-def add_native_component(slide, component, x, y, width, height):
-    """Build editable nested groups with local Paint; coordinates in inches."""
+def component_xml(component, x, y, width, height, *, start_id=1, existing_names=()):
+    """Single tree serializer for target-owning builders; no slide mutation.
+
+    Returns (XML root, mapping). Placement is in inches. The caller allocates IDs
+    and supplies occupied names from its package before inserting this one root.
+    """
     for v in (x, y, width, height):
         scalar(v, 'placement', -1e6, 1e6)
     if min(width, height) <= 0:
         raise ValueError('placement dimensions must be positive')
     parts, (vx, vy, vw, vh), names = prepare_component(component)
-    existing = {el.get('name') for el in slide._element.iter(f'{{{P_NS}}}cNvPr')}
+    existing = set(existing_names)
     if names & existing:
         raise ValueError('component output names already exist on slide')
     scale = min(width*96/vw, height*96/vh)
     ox, oy = x*96+(width*96-vw*scale)/2-vx*scale, y*96+(height*96-vh*scale)/2-vy*scale
-    next_id = max(int(el.get('id')) for el in slide._element.iter(f'{{{P_NS}}}cNvPr')) + 1
+    if type(start_id) is not int or start_id < 1:
+        raise ValueError('start_id must be a positive integer')
+    next_id = start_id
     element_map = []
 
     def allocate():
@@ -138,15 +155,20 @@ def add_native_component(slide, component, x, y, width, height):
         result = next_id; next_id += 1
         return result
 
-    def group_xml(nodes, name, parent_id=None):
+    def group_xml(nodes, name, parent_id=None, group_fill=None, compositing=None):
         group_id = allocate()
         children, bounds = [], []
         for node in nodes:
             if 'children' in node:
-                elem, box, _ = group_xml(node['children'], node['name'], group_id)
+                elem, box, _ = group_xml(node['children'], node['name'], group_id,
+                                         node['group_fill'], node['compositing'])
             else:
                 sid = allocate()
                 elem, box = path_shape_xml(node['spec'], sid, node['name'], ox, oy, scale)
+                effect = compositing_xml(node['compositing'])
+                if effect:
+                    elem.find(f'{{{P_NS}}}spPr').append(parse_xml(
+                        f'<a:wrap xmlns:a="{A_NS}">{effect}</a:wrap>')[0])
                 element_map.append(dict(source_id=node['id'], output_name=node['name'], shape_id=sid,
                                         parent_group_id=group_id, role=node['role'], bounds_inches=box))
             children.append(elem); bounds.append(box)
@@ -157,18 +179,29 @@ def add_native_component(slide, component, x, y, width, height):
                          f'<p:cNvPr id="{group_id}" name={quoteattr(name)}/><p:cNvGrpSpPr/><p:nvPr/>'
                          f'</p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="{lx}" y="{ty}"/>'
                          f'<a:ext cx="{w}" cy="{h}"/><a:chOff x="{lx}" y="{ty}"/>'
-                         f'<a:chExt cx="{w}" cy="{h}"/></a:xfrm></p:grpSpPr></p:grpSp>')
+                         f'<a:chExt cx="{w}" cy="{h}"/></a:xfrm>'
+                         f'{paint_xml(group_fill) if group_fill is not None else ""}'
+                         f'{compositing_xml(compositing)}'
+                         '</p:grpSpPr></p:grpSp>')
         for child in children:
             elem.append(child)
         return elem, [left, top, right-left, bottom-top], group_id
 
     root, _, root_id = group_xml(parts, component['output_name'])
+    return root, {'group_id': root_id, 'element_map': element_map, 'raster_count': 0,
+                 'component_sha256': hashlib.sha256(json.dumps(component, sort_keys=True, allow_nan=False).encode()).hexdigest()}
+
+
+def add_native_component(slide, component, x, y, width, height):
+    """Attach the shared serializer's result to an existing python-pptx slide."""
+    existing = {el.get('name') for el in slide._element.iter(f'{{{P_NS}}}cNvPr')}
+    next_id = max(int(el.get('id')) for el in slide._element.iter(f'{{{P_NS}}}cNvPr')) + 1
+    root, result = component_xml(component, x, y, width, height,
+                                 start_id=next_id, existing_names=existing)
     # All validation and serialization finish before this one package mutation.
     slide.shapes._spTree.insert_element_before(root, 'p:extLst')
-    return {'group': next(s for s in slide.shapes if s.shape_id == root_id),
-            'group_id': root_id, 'element_map': element_map, 'raster_count': 0,
-            'slide_part': str(slide.part.partname),
-            'component_sha256': hashlib.sha256(json.dumps(component, sort_keys=True, allow_nan=False).encode()).hexdigest()}
+    return dict(result, group=next(s for s in slide.shapes if s.shape_id == result['group_id']),
+                slide_part=str(slide.part.partname))
 
 
 def add_manifest_component(slide, manifest, component_id, x, y, width, height, *, base_dir):
@@ -191,12 +224,15 @@ def add_manifest_component(slide, manifest, component_id, x, y, width, height, *
     def verify(nodes):
         for node in nodes:
             if 'children' in node:
+                for sampled in sampled_paints(node.get('group_fill')):
+                    from appearance_fidelity import verify_sampled_paint
+                    verify_sampled_paint(Path(base_dir) / manifest['source']['path'], sampled)
                 verify(node['children'])
             else:
                 for field in ('fill', 'stroke'):
                     paint = node.get(field)
-                    if isinstance(paint, dict) and 'source_samples' in paint:
+                    for sampled in sampled_paints(paint):
                         from appearance_fidelity import verify_sampled_paint
-                        verify_sampled_paint(Path(base_dir) / manifest['source']['path'], paint)
+                        verify_sampled_paint(Path(base_dir) / manifest['source']['path'], sampled)
     verify(component['parts'])
     return add_native_component(slide, component, x, y, width, height)

@@ -1,134 +1,63 @@
 # Quality and delivery rubric
 
-Use this rubric on the actual delivered artifact. Content fidelity, visual fidelity, and editability are independent requirements; none can substitute for another. Use [quality-runner.md](quality-runner.md) for the common local audit entrypoint, status meanings, applicability and evidence provenance.
+This document owns rendered review and delivery decisions.
+[Quality-runner](quality-runner.md) owns machine status/dispatch; feature contracts
+own numerical and geometric requirements. Content, fidelity and editability do not
+compensate for each other.
 
-## Content fidelity
+## Review the saved artifact
 
-Pass when visible text, values, units, legends, panel labels, axes, scales, arrows, line semantics, and reading order agree with the source within the selected reconstruction mode.
+Reopen/reparse the deliverable and render every page/slide/canvas when a local route
+exists. Inspect each whole composition, not only a montage: missing panels, reading
+order and relative scale. Then compare all profile-required dense/recognition-critical
+crops at delivered and magnified size.
 
-Block delivery when a material label, value, relationship, unit, or direction is missing, invented, or contradicted. Mark illegible content explicitly instead of guessing.
+For image-comparable faithful/semantic work use
+`scripts/compare-reference-render.py`; overlays/differences are diagnostics, not a
+universal similarity threshold. Prioritize foreground/edges over empty background.
+Redesign checks retained content, grammar and hierarchy instead of pixel parity.
+Each requested format needs its own readback/render; no cross-format inherited PASS.
 
-## Diagram-grammar fidelity
+## Visible checks by feature
 
-Pass when the delivered visual preserves the declared diagram family and professional role semantics: process, cohort, decision, exclusion, milestone, outcome, terminator, compartment, causal or mechanistic edge, chart mark, axis, scale, and legend roles remain compatible with the source grammar.
+Use the already-loaded feature contract; do not create a second schema/checklist.
 
-Block delivery when a redraw changes representation family without explicit user authorization, or when a semantic role is replaced by an incompatible shape or mark. A visually polished flowchart-to-timeline conversion still fails when the user authorized redesign but did not authorize changing the diagram type.
-
-For a manifest-backed structured visual, run:
-
-```text
-python scripts/audit-diagram-grammar.py visual-manifest.json reopened.layout.json --fail-on-risk
-```
-
-The audit verifies role objects and allowed geometry, and separately reports directed endpoint evidence according to [diagram-grammar.md](diagram-grammar.md). A correctly named line is not proof of a semantic connection. Missing evidence is `NOT_VERIFIED`; visual review and connector routing audits remain separate.
-
-## Typography-hierarchy fidelity
-
-Pass when panel labels, titles, headings, body or node labels, axes, annotations, and footnotes retain the source's relative size and weight contrast. Complete text content does not compensate for flattened or inverted hierarchy.
-
-For a manifest that declares `typography_hierarchy`, run:
-
-```text
-python scripts/audit-typography-hierarchy.py visual-manifest.json output.pptx --fail-on-risk
-```
-
-Use [typography-hierarchy.md](typography-hierarchy.md) for the authoritative run-resolution and exception contract. Check role ratios and per-run anomalies; unresolved inherited sizes cannot be certified from object medians. Numeric evidence does not replace rendered glyph, wrapping, weight and rotation review.
-
-## Curve-coordinate fidelity
-
-Pass when every meaning-bearing curve remains a distinct editable series and its visible coordinate path preserves the source's peak, valley, shoulder, step, crossing, width, skew, tail, and ordering structure within the declared evidence quality. A smooth category-appropriate substitute is not faithful when its topology differs from the source.
-
-For a manifest that declares `curve_fidelity`, run:
-
-```text
-python scripts/audit-curve-fidelity.py visual-manifest.json output.pptx --fail-on-risk
-```
-
-The audit reads native DrawingML custom geometry from the delivered PPTX, not only the builder's input points. Block delivery for a missing, duplicated, merged, or split series; an object assigned to multiple series; excessive x-aligned trace error; a wrong prominent-peak count; or a peak outside its source-declared x tolerance. Read [curve-fidelity.md](curve-fidelity.md) for source authority, raster digitization, and current audit boundaries. Rendered crop review remains required for fine oscillations, shoulders, line weight, fill, and overlap.
-
-## Native editability
-
-Pass when required native roles use native objects, major logical modules can be selected or changed separately, and the source was not used as a flattened whole-composition substitute. An approved hybrid component has object-level move/scale/replace editability, not internally editable pixels or paths; follow [hybrid-components.md](hybrid-components.md). A mixed slide is not fully native merely because its text is editable.
-
-Use the applicable audit:
-
-| Editable source | Audit |
+| Feature | Inspect in the actual source/render comparison |
 |---|---|
-| PowerPoint `.pptx` | `scripts/audit-pptx-editability.py <deck> --fail-on-risk` |
-| SVG, draw.io, Excalidraw, Mermaid, Graphviz, or self-contained HTML | `scripts/audit-editable-source.py <source> --fail-on-risk` |
-| Dense or multi-output visual manifest | `scripts/validate-visual-manifest.py <manifest> --fail-on-warning` |
+| Content / grammar | Labels, values, units, legends, repeated-panel content, directions and diagram family; no material omission, invention or unauthorized conversion. |
+| Text / hierarchy | Readability, uncovered glyphs, intended line breaks, wrapping/rotation, weights and relative sizes. Numeric font or text-presence PASS cannot clear covered letters. |
+| Curves / charts | Every series' peaks, shoulders, steps, tails, crossings, order, fill and overlap; no merged, missing or template-replaced instances. |
+| Links / containers | Directed attachments, routes/buses, z-order, one border owner, centering, gaps and no unintended clipping/overflow. Stored binding is not drag/reroute proof. |
+| Symbols / parts | Label-free recognition, silhouettes, terminals, holes/gaps, ownership, host-detail attachment, whole-assembly coverage and occlusion. A regional PASS cannot clear a detached detail. |
+| Appearance | Source colors, tone differences, contour, transparency and overlap; no invented lighting/depth. Separate probes, paint order and visible results. |
+| Raster / hybrid | Approved scope/provenance, complete subject, aspect, placed resolution and alpha edges on light/dark/actual backgrounds. Metadata is not semantic or edge-quality proof. |
+| Editing | Required native roles and useful independently editable units. Test promised editor interactions on a copy; an SVG picture is not internally editable until verified. |
 
-- For diagrams, charts, tables, mechanisms, interfaces, and infographics, an unapproved canvas-sized picture is blocking.
-- For photographs, microscopy, radiology, maps, and other evidence images, a large raster base may be valid when overlays remain editable and the delivery report discloses it.
-- Imported SVG inside PowerPoint counts as a picture until its components are confirmed editable in PowerPoint.
-- A PNG, JPEG, PDF, or screenshot is a rendered derivative, not the canonical editable source.
-- For a dense PowerPoint task, add `--manifest <manifest.json>` so every text item declared in `source_inventory` is checked against the actual PPTX package. Add repeated `--require-text` values for exact labels that are not in the manifest.
-- Zero-byte media, broken internal image or package relationships, non-hyperlink external resources, unresolved placeholders, suspicious mojibake, missing required text, out-of-bounds top-level objects, and same-bounds duplicate border candidates are blocking risks.
-- A CJK run without an explicit East Asian typeface is a warning because a theme font may still render correctly; the reopened PowerPoint render remains the authority for glyph fit.
+Use `scripts/build-comparison-contact-sheet.py reference.png rendered.png regions.json output.png`
+for repeatable crops, not a replacement for whole-output review. Before placing a
+raster asset, and after changed extraction, run
+`scripts/audit-raster-asset-integrity.py <asset-or-directory> --fail-on-risk`;
+its standalone checks are distinct from package placement checks.
 
-## Visual fidelity
+Verify declared semantic/negative constraints even when no auditor implements them.
+Broken package/media links, zero-byte media, non-hyperlink external resources,
+placeholders, mojibake, missing text, out-of-canvas objects and same-bounds
+duplicate-border candidates remain blocking package risks. Missing explicit East
+Asian typeface is a warning requiring CJK render review, not proof of a defect.
+Evidence rasters keep editable overlays and disclosure; illustration pictures
+require their approved editing contract.
 
-For faithful and semantic reconstruction, render the actual output and run `scripts/compare-reference-render.py` against the matching source when both can be represented as images.
+## Decision and delivery
 
-- Inspect overlay and difference images at full-composition and detail level.
-- Prioritize foreground and edge differences over empty-background similarity.
-- Use similarity metrics as diagnostics, not universal pass thresholds. Apply [appearance-fidelity.md](appearance-fidelity.md) for source-bound semantic color, tone, contour, occlusion and transparency requirements. Flatness or a brighter foreground is not itself a defect; lost source distinctions or invented depth can be. Numeric probes and native paint order cannot override a failed or missing scoped visual finding.
-- A high similarity score is invalid evidence when the editability audit shows a flattened artifact.
-- In redesign mode, verify retained content, relationships, and hierarchy; pixel similarity is not the goal.
+An applicable FAIL or missing required evidence prevents an overall pass. High
+pixel similarity and native-object counts do not establish completion. Keep
+unsupported scopes, machine results and actual visual findings separate; never
+rewrite reports to manufacture acceptance. Correction/exit rules are in
+[execution-profiles](execution-profiles.md).
 
-For icons, pictograms, compact devices, and simplified scientific objects, compare source and reopened-output crops at delivered size and magnified detail. Generate repeatable contact sheets with:
-
-```text
-python scripts/build-comparison-contact-sheet.py reference.png rendered.png regions.json output.png
-```
-
-Pass only when silhouette, topology, terminals, negative spaces, host/detail attachment, orientation and stroke continuity agree with the selected reconstruction mode. Faithful source-specific objects follow [component-fidelity.md](component-fidelity.md) for source measurements, joint assembly coverage, relationship readback, regional evidence and rendered occlusion. Review the complete visible assembly as well as its parts: correctly colored individual objects may still leave background leaks at contacts. New holes and filled real holes are separate failures; equal hole counts or gap-free preparation do not prove final native rendering or correct ownership. Record relationship findings separately from regional metric status: a misaligned surface detail blocks component acceptance even when the pixel region passes. A broadly related symbol is not an acceptable substitute.
-
-For transparent or extracted raster assets, run:
-
-```text
-python scripts/audit-raster-asset-integrity.py <asset-or-directory> --fail-on-risk --contact-sheet asset-audit.png
-```
-
-Treat visible alpha pixels entering the edge-risk band, implausibly tight bounds, undersized assets, and low subject occupancy as asset risks. The hybrid PPTX audit checks embedded hashes, crop and transformed physical placement, including effective DPI and visible subject dimensions. An opaque rectangle cannot be cleared for alpha-edge clipping. Inspect the source and render on light, dark and actual backgrounds; white fringing and scientific invariants remain visual checks, not alpha-statistic PASS.
-
-## Layout, routing, and rendering
-
-Block delivery for unintended overlap, clipping, overflow, broken connectors, incorrect z-order, unresolved placeholders, objects outside the canvas, or compact symbols whose defining parts collapse, disconnect, merge, or become ambiguous at delivered size.
-
-- Execute [text clearance](text-fidelity.md) on actual label boxes, arrow shafts and arrowheads, then inspect actual glyphs. A text-presence or typography PASS cannot waive a covered label. Check unexpected wrapping, especially labels and headings intended to remain on one line.
-- Compare text-role proportions, not only individual sizes. Small source notes must remain subordinate; headings must not collapse to body scale; role tokens should be consistent across panels.
-- Enforce one stroke owner per visible container boundary. Header bands, masks, overlays, and inner backgrounds must not create a second same-bounds outline.
-- Center inner content against the measured interior box after subtracting borders, padding, title bands, and reserved icon regions; do not center it against the outer panel by eye.
-- Verify every manifest semantic constraint and negative constraint, including prohibited connections, overlaps, substitutions, curve-template shortcuts, and duplicate-border states.
-- Verify the `diagram_grammar` contract, including its visual type, authorization state, node-role geometries, edge-role matches, and routing convention.
-- Inspect every page, slide, panel, or canvas individually; a montage alone is insufficient.
-- For PowerPoint diagrams expected to use orthogonal routing, reopen the PPTX, export layout JSON, and run `scripts/audit-orthogonal-flow-lines.py <layout-json-or-dir> --require-matches --fail-on-risk`.
-- For draw.io, confirm model-scoped unique IDs and valid native/free edge endpoints under [output-formats.md](output-formats.md).
-- For SVG and HTML, check the viewBox or viewport, text clipping, external assets, and overflow in a local renderer.
-- For Excalidraw, verify scene parsing, bound labels, arrow relationships, and image-element exceptions.
-- For Mermaid and Graphviz, verify the source parses and the rendered derivative preserves node and edge semantics.
-
-## Multi-output consistency
-
-When the user requests more than one format:
-
-1. Name the canonical source or visual manifest.
-2. Verify labels, values, modules, connections, and raster exceptions against that source.
-3. Render and audit each format independently.
-4. Disclose format-specific simplifications instead of claiming identical editability or pixel parity.
-
-## Standard delivery summary
-
-Report:
-
-- reconstruction mode and target format;
-- output path and page, slide, or canvas count;
-- canonical editable source and rendered derivatives;
-- principal editable components;
-- remaining raster components and why they remain raster;
-- visual approximations or uncertain text;
-- editability or source-audit result;
-- parsing, render, overflow, connector, and visual-comparison checks actually completed.
-
-Keep detailed JSON, overlays, difference images, source notes, and temporary renders out of the final deliverables unless the user asks for them.
+Deliver file links, page count, requested previews and the canonical editable source.
+State mode/editing scope, meaningful editable units, raster origins, completed
+checks, approximations, unsupported interactions and blockers. Include profile,
+backend/fallback and correction use where they explain the result, not as another
+long checklist. Mixed artifacts are not fully native. Keep detailed logs, hashes,
+contracts and diagnostic renders with working evidence unless requested.

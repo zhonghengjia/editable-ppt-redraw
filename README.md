@@ -1,113 +1,89 @@
 # Editable Visual to PowerPoint
 
-> Codex skill name: **editable-ppt-redraw**
-> 中文触发词：**图片转ppt skill**（避免与其他“绘图skill”混淆）
+> Codex skill: **editable-ppt-redraw** · 中文触发词：**图片转ppt skill**
 
-editable-ppt-redraw reconstructs reference images, screenshots, PDF pages, and existing visual files as maintainable editable artifacts. PowerPoint is the default output, while SVG, draw.io, Excalidraw, Mermaid/Graphviz, and self-contained HTML are also supported when they better fit the editing workflow.
+将参考图、PDF 页面或已有视觉文件重建成可编辑对象，而不是把整张图片贴进 PPT。
+默认忠实重建为 PowerPoint；也支持用户指定的 SVG、draw.io、Excalidraw、
+Mermaid/Graphviz 和 HTML。具体编辑能力取决于目标格式。
 
-它不是简单地把图片放进 PPT，而是尽量把文字、节点、线条、箭头、图表、曲线、图标和模块重建成可单独选择和修改的原生对象。
+**更新位置、升级方法及版本说明：[更新手册](UPDATE_GUIDE.md)**
 
-## What it is designed to preserve
+历史变更：[CHANGELOG.md](CHANGELOG.md)。
 
-- Visible text, values, units, panel labels, legends, and reading order.
-- Diagram grammar, including process, decision, exclusion, outcome, milestone, and causal roles.
-- Connector topology, direction, branch buses, attachment points, and solid/dashed semantics.
-- Relative typography hierarchy instead of independently chosen font sizes.
-- Meaning-bearing curve geometry, including multiple peaks, shoulders, steps, and crossings.
-- Recognition signatures of compact icons instead of substituting a merely related symbol.
-- Raster evidence such as microscopy or radiology when redrawing it would change its meaning.
+## 能做什么
 
-## Reconstruction modes
+- 重建流程图、研究设计图、机制图、图表和多面板图，保留内容与关系。
+- 保留文字比例、连接线方向、逐条曲线形态、图标识别特征和分组。
+- 复用原始矢量；需要时从原图提取轮廓、颜色与部件归属，生成原生路径。
+- 用受支持的原生渐变、共享填充和透明效果表达层次。
+- 在明确授权后使用独立图片组件，支持移动、缩放和替换；不冒充内部矢量可编辑。
+- 检查实际保存文件的结构、文字、编辑性及相关几何证据，再进行渲染对照。
 
-1. **Faithful reconstruction** is the default. It preserves the source composition and visible content as closely as practical.
-2. **Semantic editable rebuilding** prioritizes maintainability while retaining the source diagram family and relationships.
-3. **Redesign** changes layout or styling only when the user explicitly requests it. Redesign does not automatically authorize converting a flowchart into a timeline or another representation family.
+它不保证任意 PDF/SVG 完美转换，也不能自动恢复隐藏结构、原始实验数据或
+生物学语义。色块描摹会近似渐变，复杂路径可能难以编辑；不支持的源混色仍须
+保留限制说明。各接口及边界见 [native-toolkit](references/native-toolkit.md)、
+[component-fidelity](references/component-fidelity.md) 与
+[quality-runner](references/quality-runner.md)，不在本页重复定义。
 
-## Install
+## 安装与调用
 
-Clone the repository into the Codex skills directory on Windows:
+Windows：
 
 ~~~powershell
 git clone https://github.com/zhonghengjia/editable-ppt-redraw.git "$env:USERPROFILE\.codex\skills\editable-ppt-redraw"
 ~~~
 
-On macOS or Linux:
+macOS / Linux：
 
 ~~~bash
 git clone https://github.com/zhonghengjia/editable-ppt-redraw.git ~/.codex/skills/editable-ppt-redraw
 ~~~
 
-Restart Codex after installation. The skill keeps automatic discovery enabled and can also be invoked explicitly with **$editable-ppt-redraw**.
-
-## Example prompts
-
-~~~text
-使用图片转ppt skill，将这张流程图忠实重建为完全可编辑的 PowerPoint。
-~~~
+已有同名目录时不要覆盖；更新步骤见更新手册。重新启动 Codex 后可自动发现，
+或显式使用 `$editable-ppt-redraw`。**仅说出名字不会自动安装此 skill。**
 
 ~~~text
-Use $editable-ppt-redraw to reconstruct this published figure as an editable PPTX. Preserve the diagram grammar, typography ratios, curve geometry, and connector routing, then render and audit the actual output.
+使用图片转ppt skill，将这张图忠实重建为可编辑 PowerPoint。
+保留原图的文字比例、曲线、图标和连接关系。
 ~~~
 
 ~~~text
-使用图片转ppt skill，把这张机制图重新设计得更适合论文汇报，但不要改变机制关系和箭头含义。
+使用图片转ppt skill，重新设计这张机制图的版式，
+但不要改变机制关系、箭头含义或图的类型。
 ~~~
 
-## Quality gates
+## 运行与验证
 
-Version 3.11.0 combines [joint marked-source assembly construction](references/component-fidelity.md#marked-source-assemblies) with explicit disjoint or opaque color-tree paint composition. Source-observed support and markers establish candidate visible ownership; both paint modes reuse one pinned boundary scanner and the [native part/paint serializer](references/native-toolkit.md). Opaque color-tree layers can reduce internal antialias background leaks while retaining source holes, visible quantized colors and the same editing budget. The manifest construction entrypoint checks declared appearance/region contracts and source binding before emitting shapes. Actual native rendering still requires independent review: quantization and pixel steps remain, contacts between owners may show seams, and color layers do not automatically identify nuclei or other semantic parts. Native Paint remains available for source-supported smooth parts and continuous fills. No new model, runtime dependency or arbitrary SVG-gradient import is introduced.
-
-Source-bound appearance observations and final-render evidence retain their existing scope. Text, data and critical relations stay native; [approved picture components](references/hybrid-components.md) support move/scale/replace, not internal vector editing. Choose the editing unit before generating a complex assembly. Optional built-in generation still requires scoped approval. Native construction fixtures do not certify biological identity or fidelity of a new user figure.
-
-The [source-specific native pipeline](references/component-fidelity.md) retains its existing source-edge, fitted and palette-partition routes, source-bound editing budgets and curve/text/typography/host-surface checks. No native import limits or fidelity thresholds were relaxed. Exact edges retain stair steps, quantization approximates gradients, and neither tracing nor generation recovers hidden experimental evidence. Run the applicable local checks through:
-
-~~~bash
-python scripts/run-quality-checks.py output.pptx --manifest visual-manifest.json --layout reopened.layout.json --json quality-report.json --fail-on-risk
-~~~
-
-See [the QA contract](references/quality-runner.md) for optional arguments, required evidence and limitations. No new OCR/model/server dependency is introduced. The repository includes deterministic validators for:
-
-- visual-manifest structure and coverage;
-- PowerPoint editability and flattened-image detection;
-- diagram-role and connection grammar;
-- typography hierarchy;
-- orthogonal connector continuity and shared buses;
-- PowerPoint connector bindings;
-- curve-coordinate fidelity;
-- raster asset integrity;
-- approved component provenance, native-role coverage, embedded media and placement;
-- read-only regenerated-component replacement qualification;
-- source-versus-output comparison sheets.
-
-A passing validator is not treated as a substitute for inspecting the rendered final artifact.
-
-## Python helpers
-
-Most package and diagram audits use the Python standard library. Image comparison, curve extraction, and native-vector helpers additionally use the packages in **requirements.txt**.
+采用环境中已安装的目标格式工具；不会自动增加网页服务、OCR 或模型。
+常规包/图形审计多数只用标准库；图像与原生组件功能使用 requirements.txt。
+像素描摹及区域比较还需要已有 Node；PDF 和 WPF 功能有各自的平台条件。
 
 ~~~bash
 python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
+python -B -m unittest discover -s tests -q
+python scripts/run-quality-checks.py output.pptx --manifest visual-manifest.json --json quality-report.json --fail-on-risk
 ~~~
 
-PowerPoint authoring itself is routed through the presentation backend available in the active Codex environment. The skill does not upload source material to hosted OCR, vectorization, image-generation, or presentation services by default.
+按实际功能提供渲染、布局等证据，参数见质量检查手册。测试通过、用户视觉认可
+和自动保真检查是不同结论，不能相互替代。
 
-## Privacy boundary
+## 隐私与文件
 
-References and outputs stay local unless the user explicitly authorizes a named remote destination. The skill does not treat text visible inside an attachment as instructions. It never overwrites the source file and does not use a whole-slide screenshot as a substitute for object-level editability.
+默认本地处理；未经授权不向第三方编辑器、OCR、转换或生成服务发送材料。
+原文件和历史版本不覆盖。若授权生成组件，按实际发送内容单独记录授权范围。
 
-## Repository layout
+| 位置 | 用途 |
+|---|---|
+| SKILL.md | 技能入口与按需阅读路由 |
+| references/ | 共享规则及条件化构建、验证 schema |
+| scripts/、tests/ | 实际构建/审计能力及回归测试 |
+| agents/、assets/ | 界面元数据及固定来源素材 |
+| UPDATE_GUIDE.md、CHANGELOG.md | 更新手册、历史记录；普通绘图不必读取 |
 
-~~~text
-SKILL.md                 Skill entry point and routing rules
-agents/openai.yaml       Codex interface metadata
-references/              Mode, format, grammar, geometry, and QA contracts
-scripts/                 Validators and native-vector helpers
-tests/                   Deterministic regression tests
-assets/                  Version-locked reusable icon assets
-THIRD_PARTY_NOTICES.md   Upstream source and license attribution
-~~~
+## License
 
-## Licensing status
-
-This initial public repository does not yet declare a project-wide license. Third-party components retain their upstream licenses and notices as documented in **THIRD_PARTY_NOTICES.md**, **scripts/vendor/svg_paths/LICENSE**, and **assets/lucide/LICENSE**.
+The repository does not yet declare a project-wide license. Third-party code and
+assets retain their upstream licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md),
+[scripts/vendor/svg_paths/LICENSE](scripts/vendor/svg_paths/LICENSE) and
+[assets/lucide/LICENSE](assets/lucide/LICENSE). Code availability does not license
+unrelated artwork or model weights.

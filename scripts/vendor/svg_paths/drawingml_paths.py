@@ -389,6 +389,56 @@ def normalize_path_commands(commands: list[PathCommand]) -> list[PathCommand]:
     return result
 
 
+def path_bounds(commands: list[PathCommand]) -> tuple[float, float, float, float]:
+    """Tight bounds of normalized M/L/C/Z geometry, excluding stroke.
+
+    Control points constrain a curve but need not lie on it. Using their hull as
+    the native shape box changes the fill's coordinate domain. Solve the cubic
+    derivative instead; keep original cubic commands for actual serialization.
+    """
+    points = []
+    current = origin = None
+    for command in commands:
+        a = command.args
+        if command.cmd == 'M':
+            current = origin = (a[0], a[1]); points.append(current)
+        elif command.cmd == 'L':
+            current = (a[0], a[1]); points.append(current)
+        elif command.cmd == 'C':
+            if current is None:
+                raise ValueError('cubic path requires initial move')
+            p = [current, (a[0], a[1]), (a[2], a[3]), (a[4], a[5])]
+            candidates = {0.0, 1.0}
+            for axis in (0, 1):
+                p0, p1, p2, p3 = [v[axis] for v in p]
+                aa = -p0+3*p1-3*p2+p3
+                bb = 2*(p0-2*p1+p2)
+                cc = p1-p0
+                tolerance = 1e-14*max(abs(aa), abs(bb), abs(cc), 1e-300)
+                if abs(aa) <= tolerance:
+                    roots = [] if abs(bb) <= tolerance else [-cc/bb]
+                else:
+                    disc = bb*bb-4*aa*cc
+                    if disc < 0:
+                        roots = []
+                    else:
+                        q = -.5*(bb+math.copysign(math.sqrt(disc), bb))
+                        roots = [-bb/(2*aa)] if q == 0 else [q/aa, cc/q]
+                candidates.update(t for t in roots if 0 < t < 1)
+            for t in candidates:
+                points.append(tuple((1-t)**3*p[0][i]+3*(1-t)**2*t*p[1][i]
+                                    +3*(1-t)*t*t*p[2][i]+t**3*p[3][i] for i in (0, 1)))
+            current = p[3]
+        elif command.cmd == 'Z':
+            current = origin
+        else:
+            raise ValueError('path_bounds requires normalized M/L/C/Z')
+    if not points:
+        return (0., 0., 0., 0.)
+    xs, ys = zip(*points)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
 def path_commands_to_drawingml(
     commands: list[PathCommand],
     offset_x: float = 0,
@@ -404,31 +454,12 @@ def path_commands_to_drawingml(
     if not commands:
         return '', 0, 0, 0, 0
 
-    # First pass: calculate bounding box
-    points: list[tuple[float, float]] = []
-    for cmd in commands:
-        if cmd.cmd in ('M', 'L'):
-            points.append((
-                cmd.args[0] * scale_x + offset_x,
-                cmd.args[1] * scale_y + offset_y,
-            ))
-        elif cmd.cmd == 'C':
-            for i in range(0, 6, 2):
-                points.append((
-                    cmd.args[i] * scale_x + offset_x,
-                    cmd.args[i + 1] * scale_y + offset_y,
-                ))
-
-    if not points:
-        return '', 0, 0, 0, 0
-
-    min_x = min(p[0] for p in points)
-    min_y = min(p[1] for p in points)
-    max_x = max(p[0] for p in points)
-    max_y = max(p[1] for p in points)
-
-    width = max(max_x - min_x, 1)
-    height = max(max_y - min_y, 1)
+    x0, y0, x1, y1 = path_bounds(commands)
+    min_x, max_x = sorted((x0*scale_x+offset_x, x1*scale_x+offset_x))
+    min_y, max_y = sorted((y0*scale_y+offset_y, y1*scale_y+offset_y))
+    # Office needs nonzero extents, not a minimum one-pixel object.
+    width = max(max_x - min_x, 1/9525)
+    height = max(max_y - min_y, 1/9525)
 
     # Second pass: generate DrawingML path commands (EMU, relative to shape)
     parts: list[str] = []

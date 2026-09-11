@@ -4,18 +4,19 @@ Choose a backend by the requested editing surface and the source geometry. Do no
 
 ## PowerPoint route
 
-Use the first available route that passes a small native-object smoke test:
+Choose the preferred route below, then obey the single-fallback budget in
+[execution-profiles.md](execution-profiles.md); this list is not three allowed attempts:
 
 1. An installed presentation skill or a live PowerPoint connection when the user wants drawing in an existing deck.
 2. A project-pinned native PPTX builder such as PptxGenJS, python-pptx, or an equivalent documented local library.
 3. Direct OOXML only when the required object cannot be represented safely through the installed builder and the resulting package can be reopened and rendered.
 
-The smoke test must create, save, reopen, and inspect one text box, one bordered shape, and one connector. Source-specific curved/layered objects additionally require the representative-component qualification in [component-fidelity.md](component-fidelity.md). Do not start a dense reconstruction when the selected route cannot preserve its required object types.
+The one backend probe covers save/reopen/render of text, a bordered shape and a connector. Source-specific curved/layered objects additionally require the representative-component qualification in [component-fidelity.md](component-fidelity.md). Do not start a dense reconstruction when the selected route cannot preserve its required object types.
 
 For nested native parts or continuous tones, reuse the [native toolkit's executable
 component/Paint route](native-toolkit.md) inside the current builder. It provides
 real grouped paths and bounded Office gradients without an additional model.
-Its SVG input parser remains a separate restricted profile; do not infer arbitrary
+Read [native-paint](native-paint.md) only for that operation. Its SVG input parser remains a separate restricted profile; do not infer arbitrary
 SVG-to-Office paint equivalence. Source-patch sampling supplies colors, not semantic
 part recognition, recovered anatomy or automatic lighting.
 
@@ -42,4 +43,5 @@ Additional routes worth probing when already installed are [svg2pptx-skill](http
 
 ## Backend record
 
-Record the selected route, installed version or commit when readily available, smoke-test result, fallback reason, and known editability boundary. Keep verbose backend logs outside the delivered visual.
+Use the single backend record defined in [execution-profiles.md](execution-profiles.md)
+and add the qualified object types and known editability boundary.
