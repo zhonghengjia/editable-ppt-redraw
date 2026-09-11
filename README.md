@@ -55,8 +55,9 @@ git clone https://github.com/zhonghengjia/editable-ppt-redraw.git ~/.codex/skill
 ## 运行与验证
 
 采用环境中已安装的目标格式工具；不会自动增加网页服务、OCR 或模型。
-常规包/图形审计多数只用标准库；图像与原生组件功能使用 requirements.txt。
-像素描摹及区域比较还需要已有 Node；PDF 和 WPF 功能有各自的平台条件。
+常规包/图形审计多数只用标准库；图像、原生组件和 PDF 功能的 Python 依赖
+统一由 requirements.txt 声明（包括 PyMuPDF）。像素描摹及区域比较还需要
+已有 Node；WPF 功能仅在 Windows 可用。
 
 ~~~bash
 python -m pip install -r requirements.txt

@@ -2,7 +2,7 @@
 name: editable-ppt-redraw
 description: Rebuild reference images, PDF pages or existing visuals as editable PowerPoint (default), SVG, draw.io or other native formats, with faithful reconstruction, authorized redesign and visual QA. Also use for 图片转ppt skill, 图转可编辑 PPT and 参考图转可编辑矢量图.
 metadata:
-  version: "3.16.0"
+  version: "3.16.1"
 ---
 
 # Editable Visual Reconstruction

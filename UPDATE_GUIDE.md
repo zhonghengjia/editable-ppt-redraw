@@ -1,5 +1,17 @@
 # 更新手册
 
+## v3.16.1：补齐 PDF 依赖声明
+
+修改位置：`requirements.txt` 声明已有 PDF 功能需要的 `PyMuPDF>=1.24.3`；
+`README.md` 统一安装说明；`SKILL.md` 更新版本号；`CHANGELOG.md` 记录原因。
+该版本下限对应官方开始使用 `pymupdf` 模块名的版本，见
+[PyMuPDF 更新记录](https://pymupdf.readthedocs.io/en/latest/changes.html#changes-in-version-1-24-3-2024-05-09)。
+
+v3.16.0 在本机测试通过，但干净的 GitHub CI 缺少该依赖，PDF 测试导入失败。
+本版从安装依赖的唯一入口解决问题，不跳过测试、不修改绘图实现或验收标准。
+CI 继续使用同一个 requirements.txt；实际运行结果以对应提交的 Actions 为准。
+v3.16.0 标签保留；正式发布使用新的 v3.16.1 标签。
+
 ## v3.16.0：按需阅读与流程精简
 
 本次更新对技能的阅读、构建和验证流程进行瘦身，**不是针对某张图增加例外**。

@@ -1,5 +1,14 @@
 # Changes
 
+## 3.16.1 — 2026-09-11 — complete PDF dependency declaration
+
+- Declare PyMuPDF in the shared requirements used by installation and CI. Existing
+  PDF helpers and tests import `pymupdf`; the clean CI environment previously lacked it.
+- Use the upstream module-name compatibility floor 1.24.3; no renderer, test,
+  acceptance threshold or workflow bypass is changed.
+- Update installation wording and the update manual. Preserve the existing v3.16.0
+  tag rather than moving it to a different commit.
+
 ## 3.16.0 — 2026-09-11 — operation-scoped instructions
 
 - Split tracing, regional/surface evidence, native Paint and native/hybrid component
