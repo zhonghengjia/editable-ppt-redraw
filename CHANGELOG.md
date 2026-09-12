@@ -1,5 +1,75 @@
 # Changes
 
+## 3.20.0 — 2026-09-12 — explicit source layers and bounded smooth-field reconstruction
+
+- Separate binary ownership, estimated continuous alpha and straight foreground
+  RGB in one explicit construction-v2 route. Reuse a shared known-background
+  inverse instead of attaching inferred alpha to already mixed source RGB.
+- Use bounded SciPy closed-form matting with explicit solver choice. Preserve
+  source observations, alpha feasibility adjustments and nonconvergence evidence.
+- Treat authorized smooth-field occlusions as unknown color, not transparent
+  holes. A joint biharmonic solve replaces the rejected experimental NS method;
+  there is no second fallback, per-image exception or anatomy completion.
+- Bind all layer outputs and their recipe to the original source before passing
+  RGBA into the existing native path emitter. Binary/native-v1 inputs retain their
+  route. Operation documents are updated in place; no model or backend is added.
+- 386 tests pass without skips in the configured two-runtime environment. Actual
+  three-background PPTX renders retain native alpha but expose palette banding.
+  Real ROS appearance and the cell cross-fade are NOT accepted; software tests do
+  not certify whole-figure fidelity. See the [research and test decision](research/2026-09-12-soft-layers.md).
+
+## 3.19.0 — 2026-09-12 — source annotations and connected native Paint
+
+- Extend the existing GrabCut initialization with source-coordinate strokes and
+  polygons, explicit hard/probable classes and order-independent conflict checks.
+  Select every hard-foreground-touched support region; retain faint disconnected
+  marks without source RGB edits, output-mask erasure or a second segmenter.
+- Preserve initialization and mark previews in the existing preparation evidence.
+  Existing point/selector inputs retain their behavior; matting and hidden-color
+  recovery are not inferred from binary support.
+- Connect canonical `native_components` to prepare/build through the existing
+  source-sampled Paint emitter and shared scene, using frozen source bytes.
+  No alternate gradient serializer, model dependency or raster fallback is added.
+- Distinguish rejected component reviews from stale bindings. Replace operation
+  guidance in place; keep current schemas in their original authorities.
+- Decisions and 21 implementation comparisons:
+  [source ownership and Paint](research/2026-09-12-source-ownership-and-paint.md).
+
+## 3.18.0 — 2026-09-11 — executable source-first production route
+
+- Connect the existing manifest inventory, foreground extraction, source-color
+  tracing, shared scene, grouped native PPTX export and quality runner through one
+  prepare/build entrypoint. There is no second segmenter, path parser or renderer.
+- Freeze source observations before construction. Use measured extracted bounds
+  for placement; resolve output names/IDs after reopening without deriving the
+  required inventory from generated objects. Supply paired source/candidate views.
+- Correct recipes and regenerate into a new directory instead of opening an old
+  deck and appending detail. Detect missing recipes, stale reviews, changed support
+  bytes and budget failures without producing a partial-deck success.
+- Check installed runtime imports and allow an explicitly selected extraction
+  interpreter, without automatic installation, cross-environment import splicing,
+  model downloads or raster fallback. Record actual runtime versions.
+- Replace operation guidance at its authority. This first executable adapter
+  covers faithful raster-canvas native text, rectangles, solid SVG and source
+  color paths; advanced Paint, other targets and semantic recognition retain
+  their existing boundaries. Actual render/editor review is never inferred.
+
+## 3.17.0 — 2026-09-11 — source-bound acquisition and common assembly
+
+- Add context/seed-driven foreground candidates using the existing color-support
+  engine or an explicitly selected installed OpenCV GrabCut adapter. Derive crop
+  bounds from support; preserve source RGB and real holes; report native-content
+  intersection and edge contact without inpainting or automatic mask approval.
+- Add one source-frame scene for stable containment/occlusion ordering and text
+  scaling. Its PPTX adapter reuses existing SVG/native-component emitters and
+  returns actual output IDs and source/target relations, not a second serializer.
+- Replace affected construction guidance with an operation-scoped interface.
+  Compare 21 code-bearing projects in the research decision, outside routine
+  instruction loading. Preserve existing schemas, backends, thresholds and models.
+- Regression scope: generic crop/order/curve/scale failures plus real-source
+  module diagnostics. This is not whole-image semantic recognition or universal
+  visual certification; inferred masks and final renders remain separately reviewed.
+
 ## 3.16.1 — 2026-09-11 — complete PDF dependency declaration
 
 - Declare PyMuPDF in the shared requirements used by installation and CI. Existing

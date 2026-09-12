@@ -93,8 +93,10 @@ million pixels, source at most 50 million pixels). It rejects nonopaque pixels,
 unqualified ICC profiles, out-of-bounds samples and source-hash changes. It cannot
 unmix a foreground from an already opaque background, infer alpha or reconstruct
 occluded colors. It estimates colors, not physically calibrated reflectance or
-lighting. Existing matting is a separately authorized optional route, not a silent
-fallback. Manually chosen colors require source/approval evidence in part observations
+lighting. The separate [source-layer operation](source-assembly.md#continuous-coverage-and-foreground-layers-construction-version-2)
+can estimate alpha and foreground against an observed constant background, and
+interpolate explicitly authorized smooth fields. It is not an automatic fallback
+or recovery of hidden scientific content. Manually chosen colors require source/approval evidence in part observations
 and must not be mislabeled as sampled colors.
 
 `native_components.add_manifest_component` re-reads declared patches, including

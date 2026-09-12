@@ -2,7 +2,7 @@
 name: editable-ppt-redraw
 description: Rebuild reference images, PDF pages or existing visuals as editable PowerPoint (default), SVG, draw.io or other native formats, with faithful reconstruction, authorized redesign and visual QA. Also use for 图片转ppt skill, 图转可编辑 PPT and 参考图转可编辑矢量图.
 metadata:
-  version: "3.16.1"
+  version: "3.20.0"
 ---
 
 # Editable Visual Reconstruction
@@ -52,8 +52,15 @@ sensitive item to avoid its checks or duplicate those definitions in another led
 ## Construct and verify
 
 Qualify one installed target-owning route via [backend-routing](references/backend-routing.md).
-Reuse supported helpers; maintain one canonical builder/manifest and regenerate
-derivatives. Dense work reviews modules before global integration.
+For multi-object reconstruction use [source-assembly](references/source-assembly.md):
+its prepare/build entrypoint consumes source inventory and extracted components/layers,
+then calls existing emitters in one coordinate/paint-order plan. Use that executable
+route for its supported native PPTX inputs; keep other qualified targets on the
+same source/scene APIs. Do not replace source extraction with generic templates or
+reuse a candidate deck as construction input. Dense work reviews modules first.
+Choose binary ownership for hard pieces, and the explicit soft-layer route for
+qualified matte/foreground estimation. Occlusion is not background; only approved
+smooth color fields may be interpolated, never hidden anatomy.
 
 Text, quantitative marks, legends and critical relationships stay native.
 Pictures require the approved editing scope; small size, tiling or large native

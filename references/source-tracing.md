@@ -4,7 +4,7 @@ Read only when source pixels must become native component geometry. The source-f
 
 ## Source selection, representation and native tracing
 
-Use one pipeline: source coordinates and assembly support → source part ownership → joint boundary representation → native paths → actual-file evidence. Ownership chooses which observed pixels belong to construction inputs; it is never an output ignore mask or semantic certification. Representation determines how those pixels become geometry; neither stage may change the acceptance contract after seeing an output.
+Use one pipeline: source coordinates and assembly support → source part ownership → joint boundary representation → native paths → actual-file evidence. If support is missing, use the [source-object acquisition](source-assembly.md#1-acquire-object-support-before-fixing-its-crop) operation before choosing the final crop. Ownership chooses which observed pixels belong to construction inputs; it is never an output ignore mask or semantic certification. Representation determines how those pixels become geometry; neither stage may change the acceptance contract after seeing an output.
 
 ### Marked-source assemblies
 
@@ -50,7 +50,13 @@ their existing alpha/budget constraints. It does not average RGB/alpha, remove f
 alpha, fill holes, blur pixels or infer hidden anatomy. Binary ownership is not
 soft alpha: within ownership, original RGBA is unchanged until color quantization.
 Retained source letters remain drawn letters, so separate source text before
-acquiring object paint. For PDFs with native text, use
+acquiring object paint. For supported soft edges and explicitly authorized smooth
+fields under labels, use the [source-layer operation](source-assembly.md#continuous-coverage-and-foreground-layers-construction-version-2).
+Its `source_layer={path,sha256}` argument binds the authoritative candidate receipt
+and all layer outputs to the original source and part plan. It is mutually
+exclusive with binary ownership/support; estimated RGB/alpha and any interpolated
+pixels stay disclosed. It does not recover arbitrary hidden artwork.
+For PDFs with native text, use
 `pdf_paint_scene.render_artwork(source, page_number, region, scale=3)`. It returns
 an RGBA image and source/page/clip/pixel-origin evidence, removes only PDF text
 in memory, keeps graphics/images and inserts no covering rectangle. The source

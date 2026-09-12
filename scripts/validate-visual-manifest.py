@@ -122,6 +122,10 @@ def validate_manifest(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {"valid": False, "errors": ["manifest root must be an object"], "warnings": [], "stats": {}}
 
+    if 'construction' in data:
+        from reconstruction_pipeline import validate_contract
+        errors.extend(validate_contract(data))
+
     if data.get("schema_version") != 1:
         errors.append("schema_version must equal 1")
 

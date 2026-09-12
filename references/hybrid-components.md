@@ -32,8 +32,10 @@ For an approved source object with existing or independently qualified alpha, us
 `scripts/raster_components.py` and the asset's optional `preparation` contract in
 [hybrid-component-schema](hybrid-component-schema.md). This is a Pillow/NumPy processing route,
 not automatic semantic segmentation or vectorization. It preserves supplied
-texture/alpha; known-matte unmixing can remove edge color contamination. Do not
-infer unknown masks/mattes, fill transparent holes or use this as a failed-native
+texture/alpha; known-matte unmixing can remove edge color contamination. If alpha
+is missing, the separate [source-object acquisition](source-assembly.md) operation
+can propose support for inspection; preparation itself must not silently infer
+unknown masks/mattes, fill transparent holes or act as a failed-native
 fallback. The crop must be an accepted editing unit, not an arbitrary panel tile.
 
 ```text

@@ -22,7 +22,7 @@ Selected assets: `assets/lucide/inventory.json`. Full upstream ISC/MIT notices: 
 
 ## Existing dependencies
 
-The toolkit calls already available python-pptx, lxml, Pillow and optional NumPy packages, each separately installed with its own license. No unlicensed, restricted-use or AGPL source code was incorporated.
+The toolkit calls already available python-pptx, lxml, Pillow and NumPy packages, each separately installed with its own license. Optional source-object extraction calls an independently installed OpenCV `grabCut`; no OpenCV code or models are vendored. `source_objects.py` and `reconstruction_scene.py` are original integration code; their source review is recorded in [the stability decision](research/2026-09-11-stability-review.md). No reviewed inpainting, OCR, segmentation-model or scene framework code was copied. No unlicensed, restricted-use or AGPL source code was incorporated.
 
 `references/upstream-lock.json` is the version/hash authority for bundled code; the asset inventory is the corresponding authority for artwork. The local wrapper and connection audit are original integration code.
 
@@ -47,9 +47,19 @@ documentation. The [PowerPoint gradient-stop interface](https://learn.microsoft.
 is used for application qualification.
 
 The source review considered SVG.js, resvg and diffvg's separation of geometry and
-paint, but their code is not bundled or imported. PyMatting, SAM, model checkpoints,
+paint, but their code is not bundled or imported. The PyMatting package, SAM, model checkpoints,
 Bioicons artwork and Blender assets are not newly included. Review of a repository
 is not adoption of its license or a claim that its runtime was tested here.
+
+`source_layers.py` independently implements the closed-form color-Laplacian
+equations reviewed in [PyMatting's implementation](https://github.com/pymatting/pymatting/blob/6d5c4a6bed0e/pymatting/laplacian/cf_laplacian.py)
+and the standard interior 13-point biharmonic boundary system reviewed in
+[scikit-image's implementation](https://github.com/scikit-image/scikit-image/blob/v0.25.2/skimage/restoration/inpaint.py).
+It uses separately installed NumPy and SciPy APIs. No PyMatting, Numba,
+scikit-image, GPL implementation or model weights are copied or imported by this
+route. The reviewed upstream projects have MIT (PyMatting) and BSD (scikit-image)
+licenses; these are algorithm/source references, not newly bundled dependencies.
+The shared source-over inverse is original algebra, not ML foreground recovery.
 
 ## Marked-source shared coverage
 

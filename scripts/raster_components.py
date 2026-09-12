@@ -75,6 +75,35 @@ def read_image(path, expected_hash=None, *, alpha=False):
         return im.copy()
 
 
+def unmix_background(pixels, alpha, background):
+    """Invert source-over for a declared background and supplied coverage.
+
+    All RGB values use encoded sRGB in 0..255; alpha is in 0..1. This does not
+    infer a background or recover hidden detail. Half-code source quantization
+    is the only permitted clipping tolerance, shared by raster/native routes.
+    """
+    observed = np.asarray(pixels, dtype=np.float64)
+    a = np.asarray(alpha, dtype=np.float64)
+    b = np.broadcast_to(np.asarray(background, dtype=np.float64), observed.shape)
+    if (observed.shape != a.shape + (3,) or not np.isfinite(observed).all()
+            or not np.isfinite(a).all() or not np.isfinite(b).all()
+            or np.any((a < 0) | (a > 1)) or np.any((observed < 0) | (observed > 255))
+            or np.any((b < 0) | (b > 255))):
+        raise ValueError('finite RGB/alpha arrays in their declared ranges required')
+    visible = a > 0
+    av = a[visible, None]
+    foreground = (observed[visible] - (1-av)*b[visible]) / av
+    tolerance = .5000001 / av
+    if np.any(foreground < -tolerance) or np.any(foreground > 255+tolerance):
+        raise ValueError('alpha/matte incompatible with source colors; no silent clipping')
+    rgb = np.zeros_like(observed)
+    rgb[visible] = np.rint(np.clip(foreground, 0, 255))
+    error = np.abs(rgb[visible]*av + (1-av)*b[visible] - observed[visible])
+    return rgb.astype(np.uint8), dict(
+        quantization_clamped_channels=int(((foreground < 0) | (foreground > 255)).sum()),
+        visible_roundtrip_max_channel_error=float(error.max(initial=0)))
+
+
 def _assets():
     import component_assets
     return component_assets
@@ -134,19 +163,8 @@ def prepare_asset(manifest, asset_id, base):
         rgb = np.asarray(out, dtype=np.float64)[:, :, :3].copy()
         visible = a > 0
         if p['rgb_mode'] == 'matted':
-            # Invert C = alpha * F + (1-alpha) * B only when B and alpha are given.
-            # Account for <= half a channel level of source 8-bit quantization.
-            background = np.array(p['matte_rgb'], dtype=np.float64)
-            av = a[visible, None]
-            foreground = (rgb[visible] - (1-av)*background) / av
-            tolerance = .5000001 / av
-            if np.any(foreground < -tolerance) or np.any(foreground > 255+tolerance):
-                raise ValueError('alpha/matte incompatible with source colors; no silent clipping')
-            metrics['quantization_clamped_channels'] = int(((foreground < 0) | (foreground > 255)).sum())
-            rgb[visible] = np.rint(np.clip(foreground, 0, 255))
-            recomposed = rgb[visible]*av + (1-av)*background
-            observed = np.asarray(out, dtype=np.float64)[:, :, :3][visible]
-            metrics['visible_roundtrip_max_channel_error'] = float(np.max(np.abs(recomposed-observed), initial=0))
+            rgb, inverse_metrics = unmix_background(rgb, a, p['matte_rgb'])
+            metrics.update(inverse_metrics)
         rgb[~visible] = 0
         rgba = np.dstack((rgb, np.asarray(alpha))).astype(np.uint8)
         out = Image.fromarray(rgba)

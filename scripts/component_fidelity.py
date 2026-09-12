@@ -287,7 +287,7 @@ def normalized_trace_svg(result, representation):
 
 def trace_component(source, output, crop, colors=16, node=None, selector=None,
                     ownership=None, representation=None, part_plan=None,
-                    support_paint='uniform', source_support=None):
+                    support_paint='uniform', source_support=None, source_layer=None):
     source, output = Path(source), Path(output)
     sidecar = output.with_suffix('.trace.json')
     failure = output.with_suffix('.trace.failed.json')
@@ -307,10 +307,12 @@ def trace_component(source, output, crop, colors=16, node=None, selector=None,
         raise ValueError('support paint must be uniform or source')
     if source_support is not None and (selector is not None or ownership is not None):
         raise ValueError('choose one source ownership method')
-    painted_support = source_support is not None or (selector is not None and support_paint == 'source')
+    if source_layer is not None and any(v is not None for v in (source_support,selector,ownership)):
+        raise ValueError('choose one source ownership/layer method')
+    painted_support = source_layer is not None or source_support is not None or (selector is not None and support_paint == 'source')
     if painted_support and part_plan is None:
         raise ValueError('source-paint support requires a source-bound part plan')
-    if support_paint == 'source' and selector is None and source_support is None:
+    if support_paint == 'source' and selector is None and source_support is None and source_layer is None:
         raise ValueError('source support paint requires explicit ownership')
     if representation is None:
         representation = 'source_edges' if selector is not None and not painted_support else 'smooth'
@@ -329,6 +331,9 @@ def trace_component(source, output, crop, colors=16, node=None, selector=None,
         cropped, selection = prepare_support(cropped, selector, ownership, source_hash, crop, support_paint)
     elif source_support is not None:
         cropped, selection = supplied_support(cropped, source_support)
+    elif source_layer is not None:
+        from source_layers import read_layer_bundle
+        cropped,selection=read_layer_bundle(source_layer,source_hash,crop)
     quantization = None
     if representation in ('palette_edges','palette_stack'):
         if representation == 'palette_stack' and any(cropped.getchannel('A').histogram()[1:255]):

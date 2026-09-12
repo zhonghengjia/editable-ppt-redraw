@@ -76,6 +76,7 @@ not source-derived thresholds. These extensions retain schema version 1.
 | Source-observed attached details | `surface_detail`, `surface_relations`: [surface-relations](surface-relations.md), source landmarks and host ownership |
 | Source-dependent appearance; all new hybrid work | `appearance_sensitive`, `appearance_fidelity`: [appearance-fidelity](appearance-fidelity.md), observations, generation binding and review evidence |
 | Executable native parts | `native_components`: [native-component-schema](native-component-schema.md); Paint in [native-paint](native-paint.md) |
+| Executable source-first PPTX preparation/assembly | `construction` and `source_inventory[].construction`: [source-assembly](source-assembly.md#executable-recipe-fields); recipes extend this inventory, never replace it with output-derived observations |
 | Approved independent pictures | `editing_policy`, assets and instances: [hybrid-component-schema](hybrid-component-schema.md); workflow in [hybrid-components](hybrid-components.md) |
 
 ## Source-of-truth rule
