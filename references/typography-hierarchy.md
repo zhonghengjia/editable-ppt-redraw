@@ -63,7 +63,7 @@ Keep role regexes mutually exclusive. A text object matching more than one role 
 ## Authoring procedure
 
 1. Create a text-role inventory from the source before setting target sizes.
-2. Measure or estimate representative source glyph heights for every role.
+2. Measure or estimate representative source glyphs for every role. For raster inputs, the optional [source measurement helper](text-fidelity.md#optional-source-measurements) compares transcribed strings with a real local font; do not treat raw glyph-height clusters as font-size groups.
 3. Normalize the measurements to the baseline role and record the ratios.
 4. Define one font-size token per role in the canonical builder. Do not scatter unrelated numeric sizes across drawing calls.
 5. Apply tokens consistently. Use a role-specific exception only when the source visibly contains that exception.

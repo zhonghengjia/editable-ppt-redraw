@@ -56,6 +56,25 @@ not install a renderer or add PDF contents to PowerPoint:
 python scripts/pdf_paint_scene.py source.pdf source-state.json --page 4 --region 89 112 139 161
 ```
 
+Add `--include-content` for source text traces (characters/font/size/seqno),
+raw text spans and line direction, whole-page font resources and per-instance
+image transforms. This optional `content_evidence` uses public APIs and records
+channel-level unavailable/unsupported/error states; the default path-only output
+is unchanged. Repeated image xrefs remain separate instances; inline or unresolved
+resources may have xref 0. Image block numbers and bbox candidates are not paint
+sequence proof. Texttrace seqno is checked against display kind, not visibility.
+Raw text includes hidden text when the API reports it: do not blindly recreate
+every span as visible content. Font resources are not one-to-one span matches or
+font-embedding permission. No image payloads or font bytes are extracted.
+
+Content mode records rotation/derotation matrices and uses unrotated default
+page bounds even for rotated pages; explicit regions remain unrotated points.
+Whole intersecting spans/images are retained, not clipped. Each channel is capped
+at 100,000 records and each text channel at 500,000 characters after the public
+API materializes its result. Oversize channels are rejected, not silently truncated.
+The extra evidence neither removes unresolved operations nor changes conversion
+status to PASS. It can inform the existing source inventory without OCR.
+
 Page is one-based; the optional region is `[x0,y0,x1,y1]` in unrotated page points.
 Coordinates are illustrative. Output refuses overwrite and includes source hash,
 extractor version, path commands, tight curve bounds, original extraction rects,

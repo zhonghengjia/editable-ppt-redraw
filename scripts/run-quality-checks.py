@@ -22,7 +22,7 @@ def load(name):
 
 
 def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=None, profile=None,
-               render_evidence=None, node=None):
+               render_evidence=None, node=None, office_evidence=None, clearance_review=None):
     artifact = Path(artifact)
     checks = []
     manifest = {}
@@ -31,18 +31,18 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
         checks.append({'check': name, 'status': status, 'required_for_automation': required,
                        'detail': detail})
 
-    def audited(name, action):
+    def audited(name, action, required=True):
         try:
             report = action()
             failed = (report.get('valid') is False or report.get('ok') is False or
                       bool(report.get('issues') or report.get('errors') or report.get('risks')) or
                       bool(report.get('totals', {}).get('blocking_risks')))
             state = 'FAIL' if failed else ('NOT_VERIFIED' if report.get('unverified') else 'PASS')
-            record(name, state, report)
+            record(name, state, report, required)
             return report
         except Exception as exc:
             # A failed prerequisite stays visible; never silently skip the audit.
-            record(name, 'NOT_VERIFIED', {'exception': type(exc).__name__, 'reason': str(exc)})
+            record(name, 'NOT_VERIFIED', {'exception': type(exc).__name__, 'reason': str(exc)}, required)
             return None
 
     digest = None
@@ -90,7 +90,24 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
         record('component_visual_review', 'NOT_VERIFIED',
                'Review each asset/instance against its comparison contract, invariants, light/dark/actual backgrounds and final-size render; no machine sign-off is inferred.', False)
 
+    # One validated envelope is reused by the layout adapter, clearance and HTML.
+    # Explicit --layout remains authoritative: invalid supplied layouts are not
+    # silently replaced with another evidence source.
+    office_module = load('office_evidence') if pptx and office_evidence else None
+    office_snapshot = office_module.read(artifact, office_evidence, digest) if office_module else None
+    inventory = manifest.get('source_inventory', [])
+    if office_snapshot is not None and isinstance(inventory, list):
+        authored_text = [item for item in inventory
+                         if isinstance(item, dict) and isinstance(item.get('construction'), dict)
+                         and item['construction'].get('kind') == 'text']
+        if authored_text:
+            audited('office_text_layout', lambda: office_module.text_layout(office_snapshot, authored_text),
+                    required=False)
+            # An observed defect matters even if unsupported text elsewhere
+            # prevents a complete Office layout measurement.
+            checks[-1]['required_for_automation'] = checks[-1]['status'] == 'FAIL'
     layouts = None
+    layout_source = None
     if layout_path:
         try:
             paths = load('audit-diagram-grammar').layout_files(Path(layout_path))
@@ -99,11 +116,26 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
                 raise ValueError('no layout objects')
             if any(d.get('artifact_sha256') != digest for d in layouts):
                 record('layout_provenance', 'NOT_VERIFIED', 'each reopened layout must record matching artifact_sha256')
+                layouts = None
             else:
                 record('layout_provenance', 'PASS', {'documents': len(layouts)})
+                layout_source = 'provided_layout'
         except (OSError, ValueError) as exc:
             record('layout_read', 'FAIL', str(exc))
             layouts = None
+    elif office_snapshot is not None and 'diagram_grammar' in manifest:
+        adapted = office_module.layouts(office_snapshot, manifest.get('canvas'))
+        scoped = office_module.grammar_scope(adapted, manifest['diagram_grammar'])
+        detail = {'source': 'validated_office_evidence', 'documents': len(adapted['documents']),
+                  'adapter_status': adapted['status'], 'contract_scope_status': scoped['status'],
+                  'unverified': scoped['unverified'], 'unselected_limitations': scoped['unselected_limitations'],
+                  'claim_boundary': 'Office extents and final-package types/native bindings; no inferred routes, ports or glyph masks.'}
+        if scoped['status'] == 'BOUND':
+            layouts = scoped['documents']
+            layout_source = 'office_evidence'
+            record('layout_provenance', 'PASS', detail)
+        else:
+            record('layout_provenance', 'NOT_VERIFIED', detail)
 
     if 'diagram_grammar' in manifest:
         if layouts is None:
@@ -132,7 +164,6 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
     else:
         record('curves', 'NOT_APPLICABLE', 'no declared curves', False)
 
-    inventory = manifest.get('source_inventory', [])
     appearance_needed = ('appearance_fidelity' in manifest or manifest.get('editing_policy') == 'hybrid'
                          or (isinstance(inventory, list) and any(isinstance(i, dict) and i.get('appearance_sensitive') is True for i in inventory)))
     if appearance_needed:
@@ -154,7 +185,15 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
         record('surface_relations', 'NOT_APPLICABLE', 'no declared surface details; manual source coverage still required', False)
 
     if 'text_clearance' in manifest:
-        audited('text_clearance', lambda: load('text_clearance').audit(artifact, manifest))
+        module = load('text_clearance')
+        clearance = audited('text_clearance', lambda: module.audit(artifact, manifest, office_evidence, office_snapshot))
+        if clearance_review:
+            try:
+                if clearance is None:raise ValueError('clearance prerequisite did not run')
+                review = module.write_review(clearance,artifact,manifest,office_evidence,clearance_review,office_snapshot)
+                record('clearance_review', 'PASS', {'path':review}, False)
+            except (OSError,ValueError,KeyError,TypeError) as exc:
+                record('clearance_review', 'NOT_VERIFIED', str(exc), False)
     elif pptx and selected == 'dense' and isinstance(inventory, list) and any(isinstance(i,dict) and i.get('role') == 'text' for i in inventory):
         record('text_clearance', 'NOT_VERIFIED', 'dense text-bearing PPTX requires label/obstacle clearance contract')
     else:
@@ -175,6 +214,9 @@ def run_checks(artifact, manifest_path=None, layout_path=None, expected_path=Non
     if routing == 'orthogonal' and not (native and native.get('geometry_complete')):
         if layouts is None:
             record('orthogonal_routes', 'NOT_VERIFIED', 'reopened routed layout required')
+        elif layout_source == 'office_evidence':
+            record('orthogonal_routes', 'NOT_VERIFIED',
+                   'Office extents/bindings do not provide explicit routed segments. Native connector geometry remains in native_connections; supply a reopened routed layout for unsupported routes.')
         else:
             def routes():
                 module = load('audit-orthogonal-flow-lines')
@@ -206,13 +248,15 @@ def main():
     parser.add_argument('--profile', choices=('fast', 'standard', 'dense'))
     parser.add_argument('--render-evidence', type=Path)
     parser.add_argument('--node', help='Existing Node.js runtime for local component checks')
+    parser.add_argument('--office-evidence', type=Path, help='Fresh verify_powerpoint.ps1 evidence; diagnostic only')
+    parser.add_argument('--clearance-review', type=Path, help='Create a new self-contained HTML clearance review')
     parser.add_argument('--json', type=Path)
     parser.add_argument('--fail-on-risk', action='store_true')
     args = parser.parse_args()
     report = run_checks(args.artifact, args.manifest, args.layout, args.expected_connections, args.profile,
-                        args.render_evidence, args.node)
+                        args.render_evidence, args.node, args.office_evidence, args.clearance_review)
     if args.json:
-        if args.json.resolve() in {p.resolve() for p in (args.artifact, args.manifest, args.layout, args.expected_connections, args.render_evidence) if p}:
+        if args.json.resolve() in {p.resolve() for p in (args.artifact, args.manifest, args.layout, args.expected_connections, args.render_evidence, args.office_evidence, args.clearance_review) if p}:
             parser.error('report must not overwrite an input')
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')

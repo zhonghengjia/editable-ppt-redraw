@@ -8,7 +8,7 @@ the repeated mechanics. This is not automatic scientific image recognition.
 
 ## Production entrypoint
 
-For a new faithful native PPTX from a raster reference, use
+For a new faithful native or approved hybrid PPTX from a raster reference, use
 `scripts/reconstruction_pipeline.py` rather than a new per-image assembly script.
 Keep **one** [visual manifest](visual-manifest.md): observe modules, visible editing
 units, text and relationships from the source before authoring. Do not derive the
@@ -17,8 +17,9 @@ segmentation; organic components need source-supported geometry, not a generic
 protein/cell template. Quantitative series keep their curve contract.
 
 The adapter supports native text, rectangles, observed solid SVG, source-color
-tracing and canonical native component trees/Paint on one source-pixel canvas.
-PDF source extraction, approved hybrid objects, existing-deck editing and other
+tracing, source-fitted/canonical native Paint, approved independent pictures and
+qualified rectangular bound links on one source-pixel canvas.
+PDF source extraction, existing-deck editing and other
 targets retain their feature-specific APIs; they are not silently converted to
 this subset. Do not switch a qualified backend midway merely to use this CLI.
 
@@ -27,6 +28,12 @@ python scripts/reconstruction_pipeline.py doctor manifest.json --node /path/to/n
 python scripts/reconstruction_pipeline.py prepare manifest.json prepared --node /path/to/node
 python scripts/reconstruction_pipeline.py build prepared build-v1 --review reviewed.json --node /path/to/node
 ```
+
+For uncertain raster-source typography, the optional `measure-text manifest.json
+text-measurements` operation uses the same text inventory before preparation.
+It produces source-bound advice and inspection crops; see
+[text-fidelity](text-fidelity.md#optional-source-measurements) for font selection,
+uncertainty and applying measurements. It is not a new required build stage.
 
 `doctor` checks the chosen installed runtimes. For extraction in a separate installed
 Python, pass `--extract-python /path/to/python` to doctor/prepare. Extraction runs
@@ -37,7 +44,11 @@ No dependencies are installed and no source leaves the machine.
 and processes every declared item. Traced objects receive a measured support/crop,
 original or explicitly estimated foreground RGB, source-context image and `comparison.png` (source left, candidate
 right in the **same context frame**). Supplied SVGs are copied and checked by the
-existing importer. Failure preserves diagnostics but produces no prepared receipt.
+existing importer. Hybrid pictures freeze the canonical approved asset and its
+preparation/reference dependencies; their review compares original source and asset.
+Source-field fits freeze support and produce a predicted field
+and compiled component under [source-fields](source-fields.md). Failure preserves
+diagnostics but produces no prepared receipt.
 
 Inspect the component comparisons and source; use `review-template.json` to record
 the actual observations in a separate `reviewed.json`. Set `accepted: true` only
@@ -47,12 +58,12 @@ The agent performs this review; it need not ask the user at each component unles
 an ambiguity changes the requested scope. A rejected mask needs corrected source
 observations under the normal bounded correction rule, not filled gaps or erasure.
 
-`build` requires this preparation and the exact support review, traces source paint
-through the existing engine, uses measured source bounds, assembles editable groups
+`build` requires this preparation and exact candidate review, traces discrete paint
+or recomputes continuous fields through the selected operation, assembles editable groups
 and native text, saves/reopens the PPTX, resolves actual output IDs and invokes the
 existing quality runner. The filename is the manifest target's basename inside a
 new build directory. Source inventory is unchanged; `resolved-manifest.json` adds
-output bindings only. `build-receipt.json` and `quality-report.json` distinguish
+output bindings and fitted Paint, retaining canonical source recipes. Receipts distinguish
 candidate creation, pending checks and visual/editor review. **CANDIDATE is not
 delivery approval**, and unperformed render checks remain unverified.
 
@@ -61,17 +72,22 @@ under [quality-runner](quality-runner.md); the CLI does not start a renderer or
 certify an image. Correct source recipes in the canonical manifest and prepare a
 new revision; rebuilding never opens an old PPTX or appends fixes. Existing
 directories are refused. An over-budget trace keeps its failure evidence and no
-partial deck is emitted. No raster fallback, ignored-item route or arbitrary
+partial deck is emitted. No unapproved raster fallback, ignored-item route or arbitrary
 callback is accepted by this adapter.
 
 ### Executable recipe fields
 
 The optional manifest `construction` extension is validated by the existing
-manifest validator. Its top level is `{"version":1,"slide_width_inches":12}`.
-Version 1 remains the binary/native compatibility contract. Use `version:2` when
-selecting `closed_form` source layers below; other routes retain their behavior.
+manifest validator. Its top-level fields are `version`, `slide_width_inches` and
+optional v4 `editing_groups` defined below.
+For example, `{"version":4,"slide_width_inches":12}` enables the current routes.
+Version 1 retains binary/native compatibility; 2 adds `closed_form` layers;
+3 adds [source-field fitting](source-fields.md); 4 adds hybrid pictures, semantic
+editing groups and rectangular bindings. Earlier routes retain behavior.
 `source.sha256` is required; `canvas` dimensions equal the original raster pixels.
 The slide preserves that aspect ratio. Other feature schemas remain applicable.
+Plain rectangles and bound links explicitly block implicit theme shadows. Declared
+native Paint effects retain their own emitter; no slide-wide effect stripping occurs.
 
 Each `source_inventory` item adds `construction` with `kind`, nonempty source
 `observation`, and the route fields below. Keep its existing ID, module, role, bbox,
@@ -83,7 +99,9 @@ representation and exact text; do not repeat these in a second scene inventory.
 | `rectangle` | `options`: optional `fill`, `stroke`, positive `stroke_pt` | `rectangle_draw`; only observed rectangular shapes/decorations |
 | `svg` | `asset`: source-derived `path`, `sha256` | `read_vectors` + `svg_draw`; restricted native SVG, no pictures or outlined labels |
 | `trace` | `extract`: method/observations below; `trace`: `colors`, `representation`, `max_native_paths`, `max_native_commands` | `extract_source_object` + `trace_component` + `svg_draw` |
-| `native_component` | No extra route fields; the item's ID/output_name references its unique canonical `native_components` entry | `manifest_component_draw` + existing manifest Paint preflight/emitter |
+| `native_component` | Same ID/output_name as its canonical `native_components` entry; optional v3 `field_fit` under [source-fields](source-fields.md) | `manifest_component_draw` + existing Paint emitter |
+| `picture` (v4) | No duplicated asset fields: item's `component_instance` references the existing approved instance | `picture_draw` + [hybrid asset contract](hybrid-component-schema.md) |
+| `rect_link` (v4) | `options`: `source_port`, `target_port` (`top/bottom/left/right`); optional `color`, positive `width_pt`; connection/endpoints below | Existing [rectangular connections](native-toolkit.md#rectangular-connections) emitter |
 
 For `trace`, the inventory bbox is the **context**. `extract` contains `method`,
 `foreground`, `background`, `reserved_regions`, `selector` only for the selector
@@ -97,18 +115,48 @@ For `native_component`, read [native-component-schema](native-component-schema.m
 and its selected Paint operation. Keep geometry, source samples and part ordering
 in that existing tree, not inside a second recipe asset. All declared trees must
 use this route. Build rechecks source-sampled Paint against the frozen source and
-uses the same scene mapping as text/paths. Continuous Paint must match an observed
-supported profile; this route does not infer a gradient or unmix boundary colors.
+uses the same scene mapping as text/paths. For measured continuous colors choose
+`field_fit`; without it, Paint is supplied explicitly. Neither changes source
+geometry; a bound estimated layer may supply foreground/alpha under its existing
+extraction assumptions, not unknown-background recovery.
 
 Optional shared recipe fields are `parent`, `behind`, integer `z`, and
-`container:true`, with the scene semantics below. Connector items use `kind:svg`,
+`container:true`, with the scene semantics below. Connector items use `kind:svg` or
+the qualified v4 `rect_link`,
 `connection` referencing the existing connection ID and `endpoints:[item1,item2]`.
 These exact item endpoints must belong to the connection's source/target modules;
 module IDs are not substituted for actual connected shapes. Include observed
 arrowheads/inhibition marks in the SVG, never infer a diagonal from its rectangle.
 Every connection and inventory item must be emitted once. One source item maps to
-one top-level native editing unit; internal color paths are editable but do not
+one named editing unit, optionally within its declared editing group; internal color paths are editable but do not
 claim automatic organelle identification or drag-bound connector behavior.
+
+Native text recipes can also declare `frame_bbox` as the authored frame in source
+pixels. The default is the inventory `bbox`. The original `bbox` remains the
+observed region used for measurement. The same canvas, parent containment and
+scene checks apply to the authored frame. See [text correction](text-fidelity.md#office-layout-and-text-correction).
+
+Pictures require `editing_policy:hybrid`, its existing explicit approval and
+`representation:component_raster`; native-required text/data/relationships cannot
+be routed to pictures. The canonical instance bbox must equal the source-frame
+placement; crop must preserve visible support/aspect, rotation is 0/90/180/270.
+Prepare freezes exact approved bytes and dependencies; build rechecks them and
+copies portable source/asset inputs beside the saved deck. No whole-panel fallback
+or second asset ledger is introduced. Source extraction still precedes approval.
+
+`construction.editing_groups` is a list of `{id,members,observation}`: a unique
+group ID, at least two source-inventory IDs, and the intended observed editing unit.
+Groups are flat/disjoint and must occupy a contiguous paint-order span; interleaved
+members are rejected because grouping would change overlap. This is distinct from
+`parent` (container background), not clipping or inferred anatomy.
+
+`rect_link` connects distinct, aligned, outward-facing **top-level rectangles**;
+its observed bbox encloses both exact ports. Both endpoints and connector stay
+outside editing groups. The driver emits/rechecks actual shape-ID bindings and
+`expected-connections.json`; qualify save/reopen/move in PowerPoint before claiming
+interactive behavior. SVG biological arrows remain static source-observed paths,
+not fake drag-bound links. See [v4 end-to-end tests](../tests/test_hybrid_assembly.py)
+for executable synthetic schema, not source geometry to copy.
 
 For executable syntax with a small synthetic source, see
 [the end-to-end regression fixture](../tests/test_reconstruction_pipeline.py).
@@ -203,68 +251,10 @@ preparation. Source comparison remains against the untouched original.
 
 ### Continuous coverage and foreground layers (construction version 2)
 
-Select `extract.method: closed_form` for a bounded, opaque sRGB source component
-with independently observed foreground/background marks and an approximately
-constant, visible background. Hard marks still fix foreground=1/background=0;
-probable and unmarked pixels are **unknown coverage**, not segmentation
-probabilities. An opaque foreground witness is an assumption that must be reviewed.
-Do not force a glow/cell cross-fade into two independently recovered objects when
-neither backdrop nor hidden surface is identifiable.
-
-Required `matting` fields:
-
-- `background_patches`: 1..32 original-source integer boxes sampling the same
-  visible background; no labels, objects or hidden-background guesses.
-- `background_tolerance`: allowed maximum sample deviation in 8-bit RGB codes,
-  0..32, selected from source before the trial. Rejection means this constant
-  background model is unsuitable; do not raise it to absorb another object.
-- `epsilon`: 1e-9..0.01 local color covariance regularization.
-- `solver`: `cg` (default) with required `max_iterations` 1..5000, or `direct`
-  without an iteration parameter. Choose based on qualified runtime/size; no
-  silent solver fallback. SciPy is required in the selected extraction Python.
-
-`source_layers.py` assembles the closed-form 3x3 color Laplacian and solves only
-unknown coverage with fixed foreground/background. Its 250,000-pixel context
-limit bounds sparse-matrix work, not fidelity. It separately estimates straight
-foreground RGB using the sampled background through the shared
-`raster_components.unmix_background` source-over inverse. To remain within the
-RGB cube it may increase **inferred** alpha to the color-feasible lower bound;
-adjustment maps/statistics disclose this choice. This is one feasible layer,
-not uniquely recovered physical alpha or hidden color. Solver convergence is
-reported before/after clipping; output quantization/adjustment is separate.
-
-Optional `occlusions` explicitly authorizes interpolation of a smooth field
-under observed overprinting. Each entry has unique `id`, `kind:smooth_field`,
-nonempty `authorization` and `marks`. Marks use the source stroke/
-polygon syntax above but `label:occluder`. They must not overlap hard ownership,
-another occluder or the outer two context pixels. All entries are interpolated
-jointly by a 13-point biharmonic sparse solve using the already selected SciPy
-runtime, so list order cannot change the result. Values are bounded by observed
-channel ranges; clamping and the raw residual are recorded. Only annotated pixels
-are modified; outside RGB is unchanged.
-The repaired pixels remain unknown to the matte solver, **not zero-alpha holes**.
-
-This operation infers low-frequency color behind labels, never cell organelles,
-experimental curves or missing scientific content. Record the authorization and
-mask; native text/relations still require their own original-source inventory.
-Interpolation is not exact-source observation, and retained overprint rims or
-insufficient neighbors require disclosure/rejection under the existing review.
-
-The candidate retains the full context coordinate domain and binds `plan`,
-`trimap`, binary `context_mask` (any represented coverage), continuous `alpha`,
-straight `rgba`, `occlusion_mask`, `coverage_adjustment`, `reconstructed_color`,
-solver/inverse results and source hashes. `reserved_regions` is still measured,
-not silently erased. A layer has `hidden_content_generated:true` when smooth
-occlusions were inferred; otherwise false. These fields are not a quality score.
-
-Prepare/build uses the **same** review protocol and checks all bundle bytes.
-Tracing consumes the authoritative candidate receipt, not caller-invented RGB
-provenance. Use `palette_edges` or explicitly selected `smooth`; `palette_stack`
-rejects partial alpha. This native path route approximates color/alpha through
-the existing palette budget, not continuous native Paint. Review light, dark and
-actual backgrounds, the final saved/reopened PPTX and practical editing scope.
-An optional dependency missing in the extraction Python is an explicit failure,
-never permission to install packages or flatten transparency.
+For `extract.method:closed_form`, read [source-layers](source-layers.md).
+It owns trimap/foreground color estimation, background assumptions, optional
+smooth-field occlusions and the bound layer bundle. Binary-only work need not
+load this contract. Prepare/build and review stay on the common entrypoint above.
 
 ## 2. Assemble once in a shared source frame
 
@@ -305,8 +295,10 @@ receipt = assemble_pptx(empty_slide, ReconstructionScene(frame, nodes))
 ```
 
 The example coordinates are synthetic syntax, not a reusable scientific layout.
-Production nested/source-sampled Paint uses `manifest_component_draw`, which calls
-the existing manifest preflight/emitter; its output name must match the scene ID.
+Production nested/source-sampled Paint uses `manifest_component_draw` with one
+`native_components.ManifestComponentBuilder` snapshot per assembly. It preflights
+the complete manifest once, preserves source checks on emission and calls the
+existing serializer; its output name must match the scene ID.
 Other already-qualified target adapters may consume `scene.ordered()` and
 `frame.place()` without changing backend. Python callbacks take `(slide, bounds,
 identity, source_scale)` and emit exactly one top-level editable shape/group. The adapter checks
@@ -316,7 +308,8 @@ Freeform relationships use source-observed SVG geometry with `role='relation'`
 and `relation=(source_id,target_id)`. Existing native SVG import preserves curve
 controls; put observed arrowhead/inhibition geometry in that same source component.
 This is not automatic raster line recognition or drag-bound rerouting. Rectangular
-bound connectors still use [native-toolkit](native-toolkit.md#rectangular-connections).
+bound connectors use v4 `rect_link` or the same qualified
+[native-toolkit](native-toolkit.md#rectangular-connections) API.
 Never derive a scientific bend from a box diagonal or invent its endpoints.
 
 Assemble on a new empty disposable slide. If a callback fails, discard that failed

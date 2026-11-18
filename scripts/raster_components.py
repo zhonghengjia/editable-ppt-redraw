@@ -37,6 +37,13 @@ def validate_preparation(asset):
     method = p.get('method')
     if method == 'preserve-alpha':
         expected = common
+    elif method == 'source-layer':
+        expected = common | {'receipt_path', 'receipt_sha256'}
+        h = p.get('receipt_sha256')
+        if not isinstance(h,str) or len(h) != 64 or any(c not in '0123456789abcdef' for c in h):
+            errors.append('invalid receipt_sha256')
+        if not isinstance(p.get('receipt_path'),str) or not p['receipt_path'].strip():
+            errors.append('receipt_path required')
     elif method == 'supplied-alpha':
         expected = common | {'alpha_path', 'alpha_sha256', 'rgb_mode'}
         if p.get('rgb_mode') == 'matted':
@@ -78,7 +85,9 @@ def read_image(path, expected_hash=None, *, alpha=False):
 def unmix_background(pixels, alpha, background):
     """Invert source-over for a declared background and supplied coverage.
 
-    All RGB values use encoded sRGB in 0..255; alpha is in 0..1. This does not
+    All RGB values use encoded sRGB in 0..255; alpha is in 0..1. Background may be
+    one RGB triple or a broadcast-compatible per-pixel RGB field supplied by an
+    independently validated caller. This function does not fit that field,
     infer a background or recover hidden detail. Half-code source quantization
     is the only permitted clipping tolerance, shared by raster/native routes.
     """
@@ -153,7 +162,15 @@ def prepare_asset(manifest, asset_id, base):
     metrics = {'method': p['method'], 'source_bbox': box, 'size': [w, h],
                'alpha_inferred': False, 'hidden_content_generated': False,
                'semantic_identity': 'NOT_VERIFIED', 'visual_fidelity': 'NOT_VERIFIED'}
-    if p['method'] == 'supplied-alpha':
+    if p['method'] == 'source-layer':
+        from source_layers import read_layer_bundle
+        out, layer_evidence = read_layer_bundle(
+            {'path':str(base/p['receipt_path']),'sha256':p['receipt_sha256']},asset['source_sha256'],box)
+        metrics.update(alpha_inferred=True,
+            hidden_content_generated=layer_evidence['hidden_content_generated'],
+            alpha_semantics=layer_evidence['alpha_semantics'],rgb_semantics=layer_evidence['rgb_semantics'],
+            physical_layer_identity='NOT_VERIFIED',source_layer=layer_evidence)
+    elif p['method'] == 'supplied-alpha':
         if out.getextrema()[3] != (255, 255):
             raise ValueError('supplied alpha requires opaque source; cannot apply alpha twice')
         alpha = read_image(base / p['alpha_path'], p['alpha_sha256'], alpha=True)

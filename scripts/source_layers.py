@@ -3,6 +3,7 @@
 Closed-form color Laplacian follows Levin et al. and the PyMatting formulation.
 The vectorized SciPy implementation here has no model/Numba dependency. Optional
 biharmonic interpolation is explicitly scoped to annotated smooth color fields.
+An opt-in affine background is fit only from independent visible source patches.
 Neither estimator identifies anatomy or recovers arbitrary hidden surfaces.
 """
 from __future__ import annotations
@@ -20,17 +21,34 @@ MAX_LAYER_PIXELS = 250_000
 def validate_layer_options(plan):
     from native_paint import keys, scalar
     m = plan.get('matting')
-    keys(m, {'background_patches', 'background_tolerance', 'epsilon', 'max_iterations','solver'},
-         {'background_patches', 'background_tolerance', 'epsilon'}, 'matting')
+    joint=isinstance(m,dict) and 'foreground_estimation' in m
+    if joint:
+        from joint_foreground import validate_color_options
+        keys(m, {'foreground_estimation','epsilon','max_iterations','solver'},
+             {'foreground_estimation','epsilon'}, 'matting fixed-alpha color route')
+        validate_color_options(m['foreground_estimation'])
+    else:
+        keys(m, {'background_patches', 'background_tolerance', 'background_model', 'epsilon', 'max_iterations','solver'},
+             {'background_patches', 'background_tolerance', 'epsilon'}, 'matting')
     solver=m.get('solver','cg')
     if solver not in ('cg','direct'): raise ValueError('matting solver must be cg or direct')
-    if not isinstance(m['background_patches'], list) or not 1 <= len(m['background_patches']) <= 32:
+    if not joint and (not isinstance(m['background_patches'], list) or not 1 <= len(m['background_patches']) <= 32):
         raise ValueError('1..32 independently observed background patches required')
-    for patch in m['background_patches']:
+    for patch in (() if joint else m['background_patches']):
         if (not isinstance(patch,list) or len(patch)!=4 or any(type(v)is not int for v in patch)
                 or min(patch[:2])<0 or min(patch[2:])<=0):
             raise ValueError('background patches need integer positive source boxes')
-    scalar(m['background_tolerance'], 'background tolerance in RGB codes', 0, 32)
+    if not joint: scalar(m['background_tolerance'], 'background tolerance in RGB codes', 0, 32)
+    if 'background_model' in m:
+        model=m['background_model']
+        keys(model, {'kind','observation','max_condition'}, {'kind','observation','max_condition'},
+             'background_model')
+        if (model['kind']!='affine' or not isinstance(model['observation'],str)
+                or not model['observation'].strip()):
+            raise ValueError('background_model needs explicit affine source observation')
+        scalar(model['max_condition'], 'background model condition limit', 1, 1_000_000)
+        if len(m['background_patches'])<4:
+            raise ValueError('affine background needs at least four independent patches')
     scalar(m['epsilon'], 'matting epsilon', 1e-9, .01)
     if solver=='cg' and (type(m.get('max_iterations')) is not int or not 1 <= m['max_iterations'] <= 5000):
         raise ValueError('bounded matting max_iterations required')
@@ -59,6 +77,120 @@ def validate_layer_options(plan):
                 raise ValueError('occluder polygon requires three distinct points')
     if len({o['id'] for o in occlusions}) != len(occlusions):
         raise ValueError('duplicate occlusion ID')
+
+
+def fit_observed_background(image, context, settings, labels, *, excluded=None, reserved=()):
+    """Fit a declared affine sRGB field, bounded by visible background patches.
+
+    This is ordinary equal-patch-weight least squares, not general background
+    recovery. Independent patch centers must constrain every leave-one-out fit;
+    their observed pixel corners must enclose the entire context. Residuals check
+    every sampled pixel and hard BG witness, not just patch averages. No robust
+    outlier deletion, regularization, model switching or extrapolation is used.
+    """
+    from source_objects import _box
+    from scipy.spatial import ConvexHull, QhullError
+    x,y,w,h=context
+    rgba=np.asarray(image.convert('RGBA'))
+    boxes=[];design=[];colors=[];centers=[];corners=[]
+    total=0
+
+    def basis(xs,ys):
+        xs=np.asarray(xs,dtype=float);ys=np.asarray(ys,dtype=float)
+        return np.stack((np.ones_like(xs),2*(xs-x)/(w-1)-1,2*(ys-y)/(h-1)-1),axis=-1)
+
+    for patch in settings['background_patches']:
+        px,py,pw,ph=_box(patch,image.size)
+        total+=pw*ph
+        if total>MAX_LAYER_PIXELS:
+            raise ValueError('affine background samples exceed total processing bound')
+        for qx,qy,qw,qh in boxes:
+            if max(px,qx)<min(px+pw,qx+qw) and max(py,qy)<min(py+ph,qy+qh):
+                raise ValueError('affine background patches must be disjoint independent observations')
+        for region in reserved:
+            rx,ry,rw,rh=_box(region,image.size)
+            if max(px,rx)<min(px+pw,rx+rw) and max(py,ry)<min(py+ph,ry+rh):
+                raise ValueError('background patch overlaps reserved native content')
+        a,b,c,d=max(px,x),max(py,y),min(px+pw,x+w),min(py+ph,y+h)
+        if a<c and b<d:
+            owned=labels[b-y:d-y,a-x:c-x]
+            if np.any((owned==1)|(owned==3)):
+                raise ValueError('background patch contradicts foreground ownership')
+            if excluded is not None and excluded[b-y:d-y,a-x:c-x].any():
+                raise ValueError('background patch overlaps inferred occlusion')
+        sampled=rgba[py:py+ph,px:px+pw]
+        if not np.all(sampled[:,:,3]==255):
+            raise ValueError('background samples must be opaque')
+        yy,xx=np.mgrid[py:py+ph,px:px+pw]
+        design.append(basis(xx,yy).reshape(-1,3))
+        colors.append(sampled[:,:,:3].reshape(-1,3).astype(float))
+        centers.append(basis(px+(pw-1)/2,py+(ph-1)/2))
+        corners.extend([[px,py],[px+pw-1,py],[px,py+ph-1],[px+pw-1,py+ph-1]])
+        boxes.append((px,py,pw,ph))
+    centers=np.asarray(centers)
+    limit=settings['background_model']['max_condition']
+
+    def solve(keep):
+        values=np.linalg.svd(centers[keep],compute_uv=False)
+        if len(values)!=3 or values[-1]<=np.finfo(float).eps*max(centers[keep].shape)*values[0]:
+            raise ValueError('affine background patch centers are rank deficient')
+        condition=float(values[0]/values[-1])
+        if not np.isfinite(condition) or condition>limit:
+            raise ValueError('affine background patch centers exceed declared condition limit')
+        # Equal patch weight prevents one large patch dominating smaller witnesses.
+        matrix=np.concatenate([design[i]/np.sqrt(len(design[i])) for i in keep])
+        target=np.concatenate([colors[i]/np.sqrt(len(colors[i])) for i in keep])
+        coefficients,_,rank,_=np.linalg.lstsq(matrix,target,rcond=None)
+        if rank!=3 or not np.isfinite(coefficients).all():
+            raise ValueError('affine background fit is rank deficient/nonfinite')
+        return coefficients,condition
+
+    indices=list(range(len(boxes)))
+    coefficients,condition=solve(indices)
+    fit_errors=[float(np.abs(design[i]@coefficients-colors[i]).max()) for i in indices]
+    heldout=[];conditions=[]
+    for i in indices:
+        other,fold_condition=solve([j for j in indices if j!=i])
+        heldout.append(float(np.abs(design[i]@other-colors[i]).max()))
+        conditions.append(fold_condition)
+    tolerance=settings['background_tolerance']
+    # This machine-precision guard is reported separately from the user's RGB
+    # tolerance. Exact integer affine fields otherwise fail a zero-code budget
+    # solely because floating-point least squares leaves ~1e-13 residuals.
+    roundoff=64*np.finfo(float).eps*255*max([condition]+conditions)
+    if max(fit_errors+heldout)>tolerance+roundoff:
+        raise ValueError('affine background samples exceed declared fit/held-out tolerance')
+    # Checking context corners suffices for containment in this convex hull.
+    sampled_corners=basis(np.asarray(corners)[:,0],np.asarray(corners)[:,1])[:,1:]
+    domain=basis(np.array([x,x+w-1,x,x+w-1]),np.array([y,y,y+h-1,y+h-1]))[:,1:]
+    try:hull=ConvexHull(sampled_corners)
+    except QhullError as exc:raise ValueError('affine background observations have no enclosing area') from exc
+    numeric_tolerance=64*np.finfo(float).eps*max(1,float(np.abs(sampled_corners).max()))
+    if np.any(domain@hull.equations[:,:2].T+hull.equations[:,2]>numeric_tolerance):
+        raise ValueError('affine background context extends outside observed patch hull; no extrapolation')
+    yy,xx=np.mgrid[y:y+h,x:x+w]
+    field=basis(xx,yy)@coefficients
+    if not np.isfinite(field).all() or np.any((field < -roundoff)|(field > 255+roundoff)):
+        raise ValueError('affine background prediction leaves RGB range; no silent clipping')
+    clamped=int(((field<0)|(field>255)).sum())
+    field=np.clip(field,0,255)
+    hard=labels==0
+    if not hard.any():raise ValueError('affine background requires hard background witnesses')
+    original=rgba[y:y+h,x:x+w,:3].astype(float)
+    hard_error=float(np.abs(field[hard]-original[hard]).max())
+    if hard_error>tolerance+roundoff:
+        raise ValueError('affine background contradicts hard background witnesses')
+    return field,dict(kind='affine',inferred=True,observation=settings['background_model']['observation'],
+        basis='[1, 2*(source_x-context_x)/(context_width-1)-1, 2*(source_y-context_y)/(context_height-1)-1]',
+        coefficients=coefficients.tolist(),patch_count=len(boxes),sample_pixels=total,
+        equal_patch_weight=True,patch_center_rank=3,condition=condition,
+        heldout_conditions=conditions,max_condition=limit,fit_patch_max_errors=fit_errors,
+        heldout_patch_max_errors=heldout,hard_background_max_error=hard_error,
+        maximum_observed_error=max(fit_errors+heldout+[hard_error]),
+        background_tolerance=tolerance,numeric_roundoff_tolerance=roundoff,
+        roundoff_clamped_channels=clamped,extrapolated_pixels=0,field_size=[w,h],
+        field_sha256=digest(np.asarray(field,dtype='<f8').tobytes()),
+        uncertainty='held-out residuals diagnose the declared affine model; no physical confidence interval')
 
 
 def closed_form_alpha(rgb, labels, *, epsilon, max_iterations=None, solver='cg'):
@@ -190,18 +322,23 @@ def extract_layer(source, plan):
     original = np.asarray(crop)[:,:,:3].copy()
     pixels = original.copy()
     settings = plan['matting']
-    patches=[]
-    for p in settings['background_patches']:
-        px,py,pw,ph = _box(p,image.size)
-        if pw*ph > MAX_LAYER_PIXELS: raise ValueError('background sample exceeds processing bound')
-        patch = image.convert('RGBA').crop((px,py,px+pw,py+ph))
-        if patch.getextrema()[3] != (255,255): raise ValueError('background samples must be opaque')
-        patches.append(np.asarray(patch)[:,:,:3].reshape(-1,3))
-    samples=np.concatenate(patches)
-    background=np.median(samples,axis=0)
-    deviation=float(np.max(np.abs(samples-background)))
-    if deviation > settings['background_tolerance']:
-        raise ValueError('background is not the declared constant matte; no hidden plane fitting')
+    joint='foreground_estimation' in settings
+    background_fit=None
+    background=None;deviation=None
+    if not joint and 'background_model' not in settings:
+        # Compatibility route: preserve the original sampling and inverse exactly.
+        patches=[]
+        for p in settings['background_patches']:
+            px,py,pw,ph = _box(p,image.size)
+            if pw*ph > MAX_LAYER_PIXELS: raise ValueError('background sample exceeds processing bound')
+            patch = image.convert('RGBA').crop((px,py,px+pw,py+ph))
+            if patch.getextrema()[3] != (255,255): raise ValueError('background samples must be opaque')
+            patches.append(np.asarray(patch)[:,:,:3].reshape(-1,3))
+        samples=np.concatenate(patches)
+        background=np.median(samples,axis=0)
+        deviation=float(np.max(np.abs(samples-background)))
+        if deviation > settings['background_tolerance']:
+            raise ValueError('background is not the declared constant matte; no hidden plane fitting')
     missing=np.zeros((h,w),dtype=bool)
     ranges=[]
     for o in plan.get('occlusions',[]):
@@ -217,20 +354,47 @@ def extract_layer(source, plan):
     if missing.any():
         pixels,interpolation=interpolate_smooth_field(original,missing)
     labels[missing]=255  # Occlusion is unknown, never transparent background.
+    if 'background_model' in settings:
+        reserved=plan['reserved_regions']
+        if not isinstance(reserved,list) or len(reserved)>1000:
+            raise ValueError('reserved_regions must be a bounded rectangle list')
+        background,background_fit=fit_observed_background(image,(x,y,w,h),settings,labels,
+            excluded=missing,reserved=reserved)
+        deviation=background_fit['maximum_observed_error']
     alpha, solver = closed_form_alpha(pixels,labels,epsilon=settings['epsilon'],
         max_iterations=settings.get('max_iterations'),solver=settings.get('solver','cg'))
     # Known B bounds the feasible alpha interval: require F in the RGB cube.
     # Increase only inferred coverage when necessary; this chooses a feasible
     # solution, not uniquely recovered true foreground. Keep the adjustment map.
-    c=pixels.astype(float)
-    with np.errstate(divide='ignore',invalid='ignore'):
-        lower=np.where(c>=background,(c-background)/np.maximum(255-background,1e-12),
-                       (background-c)/np.maximum(background,1e-12)).max(axis=2)
     unknown=(labels!=0)&(labels!=1)
-    effective=np.where(unknown,np.maximum(alpha,np.clip(lower,0,1)),alpha)
-    # Upward quantization keeps the RGB feasibility bound; no alpha thresholding.
-    coverage=np.ceil(effective*255).clip(0,255).astype('uint8')
-    rgb, inverse=unmix_background(pixels,coverage/255,background)
+    foreground_estimation=None
+    if joint:
+        from joint_foreground import estimate_foreground_background
+        # Quantize once before the color stage. The color estimator cannot
+        # increase coverage to hide RGB infeasibility or delete thin branches.
+        coverage=np.rint(alpha*255).clip(0,255).astype('uint8')
+        effective=alpha
+        foreground,estimated_background,foreground_estimation=estimate_foreground_background(
+            pixels,coverage/255,labels,settings['foreground_estimation'])
+        rgb=np.rint(foreground).clip(0,255).astype('uint8')
+        rgb[coverage==0]=0
+        estimated_background=np.rint(estimated_background).clip(0,255).astype('uint8')
+        error=np.abs((coverage/255)[:,:,None]*rgb+(1-coverage/255)[:,:,None]*estimated_background-pixels)
+        foreground_estimation.update(output_recomposition_mean_error=float(error.mean()),
+            output_recomposition_max_error=float(error.max()),
+            field_encoding='quantized RGB8; F in rgba, B in estimated_background',
+            residual_encoding='RGB8 rounded absolute recomposition error in source RGB codes')
+        inverse=dict(method='joint estimated colors; no exact-background inverse',
+            visible_roundtrip_max_channel_error=float(error[coverage>0].max(initial=0)))
+    else:
+        c=pixels.astype(float)
+        with np.errstate(divide='ignore',invalid='ignore'):
+            lower=np.where(c>=background,(c-background)/np.maximum(255-background,1e-12),
+                           (background-c)/np.maximum(background,1e-12)).max(axis=2)
+        effective=np.where(unknown,np.maximum(alpha,np.clip(lower,0,1)),alpha)
+        # Upward quantization keeps the RGB feasibility bound; no alpha thresholding.
+        coverage=np.ceil(effective*255).clip(0,255).astype('uint8')
+        rgb, inverse=unmix_background(pixels,coverage/255,background)
     rgba=Image.fromarray(np.dstack((rgb,coverage)))
     visible=coverage>0
     if not visible.any(): raise ValueError('empty estimated source layer')
@@ -241,6 +405,9 @@ def extract_layer(source, plan):
              'occlusion_mask':_png(Image.fromarray((missing*255).astype('uint8'))),
              'coverage_adjustment':_png(Image.fromarray(np.rint((effective-alpha)*255).astype('uint8'))),
              'reconstructed_color':_png(Image.fromarray(pixels))}
+    if joint:
+        outputs.update(estimated_background=_png(Image.fromarray(estimated_background)),
+            recomposition_residual=_png(Image.fromarray(np.rint(error).clip(0,255).astype('uint8'))))
     issues=[]
     reserved=plan['reserved_regions']
     if not isinstance(reserved,list) or len(reserved)>1000:
@@ -260,13 +427,25 @@ def extract_layer(source, plan):
         context_bbox=[x,y,w,h],source_bbox=[x,y,w,h],engine='closed-form color Laplacian / SciPy '+settings.get('solver','cg'),
         alpha_inferred=True,alpha_semantics='continuous_estimated_coverage',rgb_semantics='estimated_straight_foreground',
         hidden_content_generated=bool(missing.any()),hidden_content_scope='smooth_field_only',
-        background_rgb=background.tolist(),background_sample_max_deviation=deviation,
+        background_rgb=None if joint else (background.tolist() if background_fit is None else None),
+        background_sample_max_deviation=deviation,
         foreground_pixels=int(visible.sum()),intermediate_alpha_pixels=int(((coverage>0)&(coverage<255)).sum()),
         feasible_alpha_adjusted_pixels=int((effective>alpha+1e-10).sum()),
         output_alpha_adjustment_max=float(np.abs(coverage/255-alpha).max()),
         output_alpha_adjustment_mean=float(np.abs(coverage/255-alpha).mean()),reserved_overlaps=overlaps,
         solver=solver,inverse=inverse,interpolation=interpolation,occlusions=ranges,issues=issues,visual_review='NOT_PERFORMED',
         outputs_sha256={k:digest(v) for k,v in outputs.items()})
+    if joint:
+        evidence.update(bundle_version=3,foreground_estimation=foreground_estimation,
+            background_estimated=True,unobserved_background_estimated_pixels=int((coverage>0).sum()))
+        evidence['engine']+=' / NumPy fixed-alpha joint F/B colors'
+        issues.append('F/B colors are smooth estimates conditional on alpha; inspect residual and alternate backgrounds')
+    if background_fit is not None:
+        evidence['background_model']=background_fit
+        evidence['uncertainty']=dict(alpha_unknown_pixels=int(unknown.sum()),
+            hard_foreground_pixels=int((labels==1).sum()),hard_background_pixels=int((labels==0).sum()),
+            background_modeled_context_pixels=w*h,physical_layer_identity='NOT_VERIFIED')
+        issues.append('affine background and straight foreground are inferred under the declared source observations')
     return outputs,evidence
 
 
@@ -287,7 +466,30 @@ def read_layer_bundle(binding, source_hash, crop):
             or evidence.get('rgb_semantics')!='estimated_straight_foreground'):
         raise ValueError('source layer recipe/semantics binding changed')
     validate_layer_options(plan)
+    joint='foreground_estimation' in plan['matting']
+    if joint:
+        estimated=evidence.get('foreground_estimation')
+        if (evidence.get('bundle_version')!=3 or not isinstance(estimated,dict)
+                or estimated.get('kind')!='multilevel_joint_fb'
+                or estimated.get('options')!=plan['matting']['foreground_estimation']
+                or estimated.get('alpha_changed_pixels')!=0
+                or evidence.get('background_estimated') is not True):
+            raise ValueError('fixed-alpha color recipe/bundle version mismatch')
+    elif 'bundle_version' in evidence or 'foreground_estimation' in evidence:
+        raise ValueError('legacy source-layer bundle cannot declare joint color version/settings')
+    model=plan['matting'].get('background_model')
+    fitted=evidence.get('background_model')
+    if model is None:
+        if fitted is not None:raise ValueError('source layer background model/recipe mismatch')
+    elif (not isinstance(fitted,dict) or fitted.get('kind')!=model['kind']
+            or fitted.get('observation')!=model['observation']
+            or fitted.get('max_condition')!=model['max_condition']
+            or fitted.get('background_tolerance')!=plan['matting']['background_tolerance']
+            or fitted.get('field_size')!=list(crop[2:]) or fitted.get('extrapolated_pixels')!=0
+            or fitted.get('inferred') is not True or evidence.get('background_rgb') is not None):
+        raise ValueError('source layer background model/recipe mismatch')
     expected={'context_mask','alpha','rgba','trimap','occlusion_mask','coverage_adjustment','reconstructed_color'}
+    if joint: expected|={'estimated_background','recomposition_residual'}
     if set(evidence.get('outputs_sha256',{}))!=expected:raise ValueError('incomplete source layer bundle')
     for key,hsh in evidence['outputs_sha256'].items():
         if digest((path.parent/(key+'.png')).read_bytes())!=hsh:
@@ -299,7 +501,29 @@ def read_layer_bundle(binding, source_hash, crop):
             or not np.array_equal(np.asarray(alpha),np.asarray(layer)[:,:,3])
             or evidence['hidden_content_generated']!=bool(np.asarray(missing).any())):
         raise ValueError('source layer coverage/occlusion files disagree')
-    return layer,dict(method='estimated_source_layer',bundle=dict(binding),source_sha256=source_hash,
+    if joint:
+        background=read_image(path.parent/'estimated_background.png')
+        residual=read_image(path.parent/'recomposition_residual.png')
+        observed=read_image(path.parent/'reconstructed_color.png')
+        adjustment=read_image(path.parent/'coverage_adjustment.png',alpha=True)
+        if (any(im.mode!='RGB' or im.size!=layer.size for im in (background,residual,observed))
+                or adjustment.size!=layer.size or np.asarray(adjustment).any()):
+            raise ValueError('fixed-alpha color companions/adjustment disagree')
+        pixels=np.asarray(layer);a=np.asarray(alpha)/255
+        b=np.asarray(background);c=np.asarray(observed)
+        error=np.abs(a[:,:,None]*pixels[:,:,:3]+(1-a)[:,:,None]*b-c)
+        error_metrics=[estimated.get(key) for key in ('output_recomposition_mean_error','output_recomposition_max_error')]
+        if any(type(value) not in (int,float) or not np.isfinite(value) for value in error_metrics):
+            raise ValueError('finite fixed-alpha recomposition metrics required')
+        if (not np.array_equal(np.asarray(residual),np.rint(error).clip(0,255).astype('uint8'))
+                or not np.array_equal(pixels[:,:,:3][a==1],c[a==1])
+                or not np.array_equal(b[a==0],c[a==0])
+                or abs(estimated.get('output_recomposition_mean_error',float('inf'))-float(error.mean()))>1e-12
+                or abs(estimated.get('output_recomposition_max_error',float('inf'))-float(error.max()))>1e-12):
+            raise ValueError('fixed-alpha output colors/residual/anchors disagree')
+    provenance=dict(method='estimated_source_layer',bundle=dict(binding),source_sha256=source_hash,
         source_bbox=list(crop),plan_sha256=evidence['plan_sha256'],
         alpha_semantics=evidence['alpha_semantics'],rgb_semantics=evidence['rgb_semantics'],
         hidden_content_generated=evidence['hidden_content_generated'],physical_layer_identity='NOT_VERIFIED')
+    if joint: provenance.update(bundle_version=3,foreground_estimation=dict(estimated))
+    return layer,provenance

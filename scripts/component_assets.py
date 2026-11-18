@@ -354,6 +354,29 @@ def read_objects(archive):
     return objects,size
 
 
+def _native_group_objects(archive):
+    """Actual named native-group identities, for coverage only.
+
+    read_objects deliberately remains leaf-only: replacement verification must
+    not treat an enclosing group's XML as an unrelated object when one approved
+    picture changes. Coverage still inspects the full selected group subtree.
+    """
+    existing = load('audit-pptx-editability')
+    parts, _ = existing.slide_parts_in_order(archive)
+    groups = []
+    for slide, part in enumerate(parts, 1):
+        root = ET.fromstring(archive.read(part))
+        for group in root.findall('.//p:grpSp', NS):
+            identity = group.find('p:nvGrpSpPr/p:cNvPr', NS)
+            # An empty grouping wrapper is not a reconstructed native object.
+            content = any(group.find('.//p:' + tag, NS) is not None
+                          for tag in ('sp', 'cxnSp', 'graphicFrame', 'pic'))
+            if identity is not None and content:
+                groups.append(dict(slide=slide, name=identity.get('name', ''), kind='grpSp',
+                                   xml=ET.tostring(group).decode()))
+    return groups
+
+
 def audit(artifact, manifest, manifest_path=None):
     errors = validate_contract(manifest)
     report = dict(valid=not errors, errors=errors, unverified=[], instances=[], assets=[],
@@ -368,6 +391,7 @@ def audit(artifact, manifest, manifest_path=None):
     raster = load('audit-raster-asset-integrity')
     with zipfile.ZipFile(artifact) as archive:
         objects,size = read_objects(archive)
+        native_groups = _native_group_objects(archive)
         assets = {a['asset_id']:a for a in manifest['component_assets']}
         blobs = {}
         for aid,a in assets.items():
@@ -459,8 +483,11 @@ def audit(artifact, manifest, manifest_path=None):
         for item in manifest['source_inventory']:
             if item.get('representation') not in NATIVE:
                 continue
-            matches = [o for o in objects if (o['slide'],o['name']) == (item.get('output_slide',1),item['output_name'])]
-            if len(matches) != item.get('required_count',1) or any(o['kind'] == 'pic' or ET.fromstring(o['xml']).find('.//a:blip',NS) is not None for o in matches):
+            matches = [o for o in objects + native_groups
+                       if (o['slide'],o['name']) == (item.get('output_slide',1),item['output_name'])]
+            if len(matches) != item.get('required_count',1) or any(
+                    o['kind'] == 'pic' or ET.fromstring(o['xml']).find('.//a:blip',NS) is not None
+                    or ET.fromstring(o['xml']).find('.//p:pic',NS) is not None for o in matches):
                 errors.append(f"{item['id']}: required native object coverage failed")
         # Inherited media cannot evade registration inside a master/layout/background.
         for name in archive.namelist():

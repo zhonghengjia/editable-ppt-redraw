@@ -4,7 +4,7 @@ Read only when source pixels must become native component geometry. The source-f
 
 ## Source selection, representation and native tracing
 
-Use one pipeline: source coordinates and assembly support → source part ownership → joint boundary representation → native paths → actual-file evidence. If support is missing, use the [source-object acquisition](source-assembly.md#1-acquire-object-support-before-fixing-its-crop) operation before choosing the final crop. Ownership chooses which observed pixels belong to construction inputs; it is never an output ignore mask or semantic certification. Representation determines how those pixels become geometry; neither stage may change the acceptance contract after seeing an output.
+Use source coordinates/support → part ownership → boundary representation → native paths → actual-file evidence. Missing support uses [source acquisition](source-assembly.md#1-acquire-object-support-before-fixing-its-crop). Ownership is construction evidence, never a final-QA ignore mask. Choose representation before authoring: every color-tracing mode here quantizes paint; `smooth` fits geometry, not continuous color. For smooth tones on established source geometry use [source-fields](source-fields.md).
 
 ### Marked-source assemblies
 
@@ -51,7 +51,7 @@ alpha, fill holes, blur pixels or infer hidden anatomy. Binary ownership is not
 soft alpha: within ownership, original RGBA is unchanged until color quantization.
 Retained source letters remain drawn letters, so separate source text before
 acquiring object paint. For supported soft edges and explicitly authorized smooth
-fields under labels, use the [source-layer operation](source-assembly.md#continuous-coverage-and-foreground-layers-construction-version-2).
+fields under labels, use the [source-layer operation](source-layers.md).
 Its `source_layer={path,sha256}` argument binds the authoritative candidate receipt
 and all layer outputs to the original source and part plan. It is mutually
 exclusive with binary ownership/support; estimated RGB/alpha and any interpolated

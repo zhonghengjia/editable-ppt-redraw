@@ -39,7 +39,7 @@ auditors a second time on unchanged inputs merely because a reference shows thei
 |---|---|---|
 | Every artifact | Read/hash and target editability; PPTX package or supported editable-source auditor. Unknown format unverified. | [output-formats](output-formats.md) |
 | Supplied manifest | Schema, inventory and declared extension validation, including optional native component trees. Dense without manifest unverified. | [visual-manifest](visual-manifest.md) |
-| `diagram_grammar` | Roles and directed endpoints from reopened layout | [diagram-grammar](diagram-grammar.md) |
+| `diagram_grammar` | Roles and directed endpoints from reopened layout; supported objects can reuse `--office-evidence` when no `--layout` was supplied | [diagram-grammar](diagram-grammar.md) |
 | `typography_hierarchy` | Actual PPTX runs or resolved per-run layout | [typography-hierarchy](typography-hierarchy.md) |
 | `curve_fidelity` | Actual native PPTX custom paths; other targets unverified | [curve-fidelity](curve-fidelity.md) |
 | Every PPTX | Native binding inspection; optional `--expected-connections` adds source/target and arrow expectations | [native-toolkit](native-toolkit.md) |
@@ -47,7 +47,8 @@ auditors a second time on unchanged inputs merely because a reference shows thei
 | `regional_fidelity`, `fidelity_sensitive` or `structure_sensitive` | Original source vs final render via `--render-evidence` and existing Node. Structural-only declarations invoke the same auditor. | [regional-fidelity](regional-fidelity.md) |
 | `surface_relations` or `surface_detail` | Native host/detail landmarks, containment and paint order | [component-fidelity](component-fidelity.md) |
 | `appearance_fidelity`, `appearance_sensitive` or hybrid policy | Source color/tone probes, native/mixed paint order, hash-bound reviewer records via `--render-evidence` | [appearance-fidelity](appearance-fidelity.md) |
-| `text_clearance` | Native PPTX label/path boxes. Missing contract for dense text-bearing PPTX unverified. | [text-fidelity](text-fidelity.md) |
+| `text_clearance` | Native PPTX label/path boxes, including text-only slides; optional Office bounds add frame-overflow candidates. Missing contract for dense text-bearing PPTX unverified. | [text-fidelity](text-fidelity.md) |
+| Native text recipes with resolved IDs and `--office-evidence` | Compares actual rendered line count and text-frame containment for supported top-level text. Detected defects block automation. Missing line evidence or unsupported geometry is separately unverified. | [Text correction](text-fidelity.md#office-layout-and-text-correction) |
 | Hybrid policy | Asset/instance package readback within PPTX editability: bytes, names, native roles, transforms, crop, visible resolution and anchors. Other targets unverified. | [hybrid-components](hybrid-components.md) |
 
 Feature contracts retain their exact failure, applicability and unsupported-geometry
@@ -62,6 +63,7 @@ Do not omit difficult source items or sensitive declarations to get NOT_APPLICAB
 
 - Each reopened layout document includes `artifact_sha256` matching the final
   artifact. Measure after saving/reopening, not from builder-side geometry.
+  Stale layouts are not passed to downstream geometry checks.
 - Render evidence binds artifact, source and actual rendered bytes under the
   [regional evidence contract](regional-fidelity.md). Hashes associate files; they do not
   authenticate rendering history, scientific semantics or reviewer identity.
@@ -69,6 +71,44 @@ Do not omit difficult source items or sensitive declarations to get NOT_APPLICAB
   Never attach a new hash to stale geometry, images or review assertions.
 - Keep reports, source traces, contracts and hashes with working QA material,
   not as private paths or extraction logs inside the visual.
+
+### Installed PowerPoint evidence (optional Windows route)
+
+Use the reusable application utility, not a per-image COM script:
+
+```powershell
+pwsh -File scripts/verify_powerpoint.ps1 -Artifact final.pptx -OutputDir new-office-evidence
+```
+
+It opens the source read-only, renders each slide and records actual slide-point
+text bounds, group membership and native bindings in `office-evidence.json`.
+An optional `-EditPlan plan.json` tests only an isolated copy, saves/reopens it and
+checks requested text, move or line-color operations. Plan syntax is in the
+[script header](../scripts/verify_powerpoint.ps1); `-RenderWidth` defaults to 1600.
+Output must be new. Already-open source presentations are refused; the utility
+never quits the user's application or closes another presentation.
+
+Pass `--office-evidence new-office-evidence/office-evidence.json` to the quality
+runner; add `--clearance-review new-clearance.html` for self-contained localized
+previews. One shared consumer checks artifact/render hashes, exact final slide
+coverage, slide dimensions, names and actual text. PowerPoint 16's measured 1/8-point PageSetup normalization is
+matched exactly, not handled by loosening source geometry thresholds.
+Red boxes show XML text frames; green boxes show PowerPoint text bounds.
+`layout_box_only` helps triage frame-padding candidates; it **does not waive** a
+collision or establish glyph visibility. The same clearance scan now unions
+XML-frame and actual-text-bound candidates, including overflow-only intersections,
+without duplicate findings. Local previews cover both objects and both bounds.
+Rotated group text and table-cell bounds remain unsupported; edits, readability
+and fidelity are distinct results.
+
+When `diagram_grammar` is declared and no explicit layout is supplied, the same
+snapshot supplies actual shape extents, final-package preset types and native
+connector bindings. Qualification is scoped to the contract's named nodes/edges;
+unrelated custom artwork does not block supported rectangles, while all limitations
+remain in the report. Required custom/rotated geometry stays unverified. No bbox
+is converted into a guessed route or semantic port; unsupported orthogonal routes
+still require reopened segment evidence. An explicitly supplied stale layout is
+never silently replaced with this route.
 
 ## Checks outside the runner
 

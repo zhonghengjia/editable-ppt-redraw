@@ -329,6 +329,8 @@ def add_rect_link(slide, source, target, *, source_port='bottom', target_port='t
     if not math.isfinite(width_pt) or width_pt <= 0:
         raise ValueError('Line width must be positive')
     link = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, *start, *end)
+    # A plain source-observed link must not inherit an undeclared theme shadow.
+    link.shadow.inherit = False
     link.name = name
     link.begin_connect(source, PORTS[source_port])
     link.end_connect(target, PORTS[target_port])

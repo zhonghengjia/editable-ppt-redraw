@@ -39,6 +39,13 @@ For executable local source-crop preparation, add one optional `preparation` obj
   `rgb_mode: "straight"` or `"matted"`: use a provided crop-sized 8-bit L alpha
   image, not a predicted mask. `matted` additionally requires known `matte_rgb`
   as three 0..255 integers; no other preparation fields are allowed.
+- `method: "source-layer"`, `authorization`, `receipt_path`, `receipt_sha256`:
+  consume the exact original-source-bound versioned layer receipt from
+  [source-layer extraction](source-layers.md).
+  Preserve its estimated straight RGB, continuous alpha and hidden-content status;
+  no resize, second matte inference or promotion to observed physical alpha.
+  The receipt's source hash/context must match the asset crop. All companion bytes
+  remain bound and travel together through v4 prepare/build.
 
 Preparation requires an integer source-pixel crop, exact source size/hash and
 single-frame RGB/RGBA source with normalized orientation and no unqualified ICC.
@@ -48,7 +55,8 @@ rounding; it does not infer the compositing color space. Qualify that convention
 before use. Low alpha amplifies quantization and cannot recover exact lost RGB.
 The planned asset may omit its target `sha256` only while invoking preparation;
 the returned candidate and all ordinary validation require the computed hash.
-The ordinary package audit re-executes this recipe and compares RGBA pixels as
+The ordinary package audit re-executes preparation (or validates and reads the
+bound source-layer bundle; it does not rerun its estimator) and compares RGBA pixels as
 well as embedded bytes. Neither given alpha nor reproducibility proves correct
 object boundaries. Processing/preview limits and commands live in
 [hybrid-components.md](hybrid-components.md).

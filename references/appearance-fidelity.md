@@ -22,8 +22,9 @@ whole-object front/back order cannot express the visible relation. Do not invent
 a global depth graph for objects that cross in both directions.
 
 Select native solid fills for source-flat parts. For visible continuous tones,
-construct source-supported Paint with the [native toolkit](native-toolkit.md),
-keeping the part tree and geometry fixed while colors are assigned. Discrete color
+fit [source fields](source-fields.md) on observed geometry when supported, or use
+explicit source-supported Paint from the [native toolkit](native-toolkit.md).
+Keep the part tree and geometry fixed while assigning colors. Discrete color
 regions remain a separate representation choice; quantization is an approximation,
 not preservation of a continuous gradient. A prompt requirement alone does not
 produce native shading or enforce a part relationship.
@@ -93,7 +94,7 @@ million pixels, source at most 50 million pixels). It rejects nonopaque pixels,
 unqualified ICC profiles, out-of-bounds samples and source-hash changes. It cannot
 unmix a foreground from an already opaque background, infer alpha or reconstruct
 occluded colors. It estimates colors, not physically calibrated reflectance or
-lighting. The separate [source-layer operation](source-assembly.md#continuous-coverage-and-foreground-layers-construction-version-2)
+lighting. The separate [source-layer operation](source-layers.md)
 can estimate alpha and foreground against an observed constant background, and
 interpolate explicitly authorized smooth fields. It is not an automatic fallback
 or recovery of hidden scientific content. Manually chosen colors require source/approval evidence in part observations

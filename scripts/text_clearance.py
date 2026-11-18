@@ -1,9 +1,14 @@
 """Conservative label-box versus native paths/labels. Not an OCR or glyph audit."""
 import importlib.util
+import base64
+import html
 import math
 from pathlib import Path
+import re
 import xml.etree.ElementTree as ET
 import zipfile
+
+import office_evidence as office
 
 
 def validate_contract(manifest):
@@ -66,7 +71,13 @@ def boxes_overlap(a,b,gap):
     return min(a[0]+a[2]+gap,b[0]+b[2]+gap)>max(a[0],b[0])+1e-7 and min(a[1]+a[3]+gap,b[1]+b[3]+gap)>max(a[1],b[1])+1e-7
 
 
-def audit(artifact,manifest):
+def office_bounds(artifact, evidence_path, canvas, selected_names=None, validated_office=None):
+    """Reuse the shared envelope authority; rectangles are not glyph masks."""
+    evidence = validated_office if validated_office is not None else office.read(artifact, evidence_path)
+    return office.text_bounds(evidence, canvas, selected_names)
+
+
+def audit(artifact,manifest,office_evidence=None,validated_office=None):
     errors=validate_contract(manifest)
     report={'valid':not errors,'errors':errors,'unverified':[],'collisions':[],
             'claim_boundary':'Actual native text boxes versus sampled native custom paths, stroke padding and other text boxes. Not exact glyph visibility, arbitrary shape or renderer certification.'}
@@ -80,7 +91,8 @@ def audit(artifact,manifest):
     with zipfile.ZipFile(artifact) as z:
         size=ET.fromstring(z.read('ppt/presentation.xml')).find('p:sldSz',reader.NS)
         sx=manifest['canvas']['width']/int(size.get('cx'));sy=manifest['canvas']['height']/int(size.get('cy'))
-        for part in sorted({p['slide_part'] for p in profiles}):
+        # Text-only slides also need clearance; custom paths are not a slide index.
+        for part in sorted(n for n in z.namelist() if re.fullmatch(r'ppt/slides/slide\d+\.xml', n)):
             root=ET.fromstring(z.read(part));parents={child:parent for parent in root.iter() for child in parent}
             for s in root.findall('.//p:sp',reader.NS):
                 props=s.find('p:nvSpPr/p:cNvPr',reader.NS);name=props.get('name','')
@@ -101,7 +113,7 @@ def audit(artifact,manifest):
                     xx=sorted(p[0]*sx for p in corners);yy=sorted(p[1]*sy for p in corners)
                     if name in c['label_names']:
                         if not any((t.text or '').strip() for t in s.findall('.//a:t',reader.NS)):raise ValueError('selected label has no text')
-                        labels.append({'name':name,'slide':part,'box':[xx[0],yy[0],xx[1]-xx[0],yy[1]-yy[0]]})
+                        labels.append({'name':name,'slide':part,'text':'\n'.join(''.join(t.text or '' for t in para.findall('.//a:t',reader.NS)) for para in s.findall('p:txBody/a:p',reader.NS)), 'box':[xx[0],yy[0],xx[1]-xx[0],yy[1]-yy[0]]})
                     ln=s.find('p:spPr/a:ln',reader.NS)
                     # Group scaling affects line width too; use larger axis conservatively.
                     group_scale=math.prod(max(abs(t[0]),abs(t[1])) for t in transforms[1:])
@@ -120,13 +132,95 @@ def audit(artifact,manifest):
     for name in c['label_names']:
         matches=[p for p in labels if p['name']==name]
         if len(matches)!=1:errors.append(f'{name}: expected one unique resolved label, got {len(matches)}')
+    evidence = validated_office if validated_office is not None else office.read(artifact,office_evidence)
+    measured = office_bounds(artifact,office_evidence,manifest['canvas'],c['label_names'],evidence)
+    report['unverified'].extend(measured['unverified'])
+    report['office_evidence'] = {'status':measured['status'], 'unselected_limitations':measured['unselected_limitations'], 'claim_boundary':'PowerPoint text bounding rectangles add overflow candidates and localize findings; not OCR, glyph masks, visual approval or automatic waivers.'}
+    # Match displayed slide order to package parts. Minimal unit-test packages may
+    # omit relationships; that fallback is used only without Office evidence.
+    slide_indexes = {}
+    with zipfile.ZipFile(artifact) as z:
+        if 'ppt/_rels/presentation.xml.rels' in z.namelist():
+            import posixpath
+            rels = {r.get('Id'):posixpath.normpath(posixpath.join('ppt',r.get('Target',''))).lstrip('/') for r in ET.fromstring(z.read('ppt/_rels/presentation.xml.rels')) if r.get('TargetMode') != 'External'}
+            root = ET.fromstring(z.read('ppt/presentation.xml'))
+            ids = root.findall('p:sldIdLst/p:sldId',reader.NS)
+            for number, item in enumerate(ids,1):
+                target = rels.get(item.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'))
+                if target:slide_indexes[target]=number
+    if evidence['status'] == 'BOUND':
+        slide_indexes = {part:index for index,part in evidence['slide_parts'].items()}
+    def measurement(label):
+        part = label['slide']; index = slide_indexes.get(part)
+        found = measured['bounds'].get((index,label['name']))
+        if found:
+            if ' '.join(found['text'].split()) == ' '.join(label['text'].split()):return found['box']
+            warning=f"{label['name']}: Office text differs from final PPTX; actual bounds unavailable"
+            if warning not in report['unverified']:report['unverified'].append(warning)
+        return None
+    # Resolve every selected label before scanning, including those outside frame candidates.
+    actual_boxes={(label['slide'],label['name']):measurement(label) for label in labels}
+    if measured['status']=='BOUND':
+        for label in labels:
+            if actual_boxes[(label['slide'],label['name'])] is None:
+                warning=f"{label['name']}: matching unrotated Office text bounds unavailable"
+                if warning not in report['unverified']:report['unverified'].append(warning)
+    def collision(label, other, kind, triggers):
+        lb = actual_boxes[(label['slide'],label['name'])]
+        ob = actual_boxes[(other['slide'],other['name'])] if kind == 'label-label' else None
+        verdict = 'office_bounds_unavailable'
+        if lb is not None and (kind == 'label-path' or ob is not None):
+            intersects = boxes_overlap(lb,ob,c['min_gap_px']) if ob is not None else path_hits_box(other['points'],lb,c['min_gap_px']+other['width']/2,other['closed'])
+            verdict = 'actual_text_bounds_overlap' if intersects else 'layout_box_only'
+        report['collisions'].append({'label':label['name'],'obstacle':other['name'],'kind':kind,
+            'slide_part':label['slide'],'slide':slide_indexes.get(label['slide']), 'label_box_px':label['box'],
+            'other_box_px':other.get('box'), 'measured_label_box_px':lb,'measured_other_box_px':ob,
+            'candidate_sources':triggers,
+            'diagnostic':verdict, 'action':'Review this location in the final render; measurements do not waive the geometry finding.'})
     for i,label in enumerate(labels):
         for other in labels[i+1:]:
-            if other['slide']==label['slide'] and boxes_overlap(label['box'],other['box'],c['min_gap_px']):
-                report['collisions'].append({'label':label['name'],'obstacle':other['name'],'kind':'label-label'})
+            if other['slide']!=label['slide']:continue
+            triggers=[]
+            if boxes_overlap(label['box'],other['box'],c['min_gap_px']):triggers.append('xml_frame')
+            lb=actual_boxes[(label['slide'],label['name'])];ob=actual_boxes[(other['slide'],other['name'])]
+            if lb is not None and ob is not None and boxes_overlap(lb,ob,c['min_gap_px']):triggers.append('office_text_bounds')
+            if triggers:collision(label,other,'label-label',triggers)
         for other in chosen:
-            if other['slide']==label['slide'] and path_hits_box(other['points'],label['box'],c['min_gap_px']+other['width']/2,other['closed']):
-                report['collisions'].append({'label':label['name'],'obstacle':other['name'],'kind':'label-path'})
+            if other['slide']!=label['slide']:continue
+            pad=c['min_gap_px']+other['width']/2;triggers=[]
+            if path_hits_box(other['points'],label['box'],pad,other['closed']):triggers.append('xml_frame')
+            lb=actual_boxes[(label['slide'],label['name'])]
+            if lb is not None and path_hits_box(other['points'],lb,pad,other['closed']):triggers.append('office_text_bounds')
+            if triggers:collision(label,other,'label-path',triggers)
     report['label_count']=len(labels);report['obstacle_count']=len(chosen)
     report['valid']=not errors and not report['collisions']
     return report
+
+
+def write_review(report,artifact,manifest,office_evidence,output,validated_office=None):
+    """Self-contained HTML with clipped render previews, not modified source art."""
+    evidence = office_bounds(artifact,office_evidence,manifest['canvas'],manifest['text_clearance']['label_names'],validated_office)
+    if evidence['status'] != 'BOUND':
+        raise ValueError('fresh hash-bound Office evidence required for review previews')
+    output = Path(output)
+    if output.exists():raise ValueError('review output already exists')
+    width,height=manifest['canvas']['width'],manifest['canvas']['height']
+    images={k:base64.b64encode(Path(v).read_bytes()).decode('ascii') for k,v in evidence['renders'].items()}
+    definitions='<svg width="0" height="0" aria-hidden="true"><defs>'+''.join(f'<image id="render-{k}" href="data:image/png;base64,{v}" width="{width}" height="{height}"/>' for k,v in images.items())+'</defs></svg>'
+    cards=[]
+    for item in report['collisions']:
+        index=item.get('slide')
+        boxes=[item[key] for key in ('label_box_px','other_box_px','measured_label_box_px','measured_other_box_px') if item.get(key)]
+        left=max(0,min(b[0] for b in boxes)-12);top=max(0,min(b[1] for b in boxes)-12)
+        right=min(width,max(b[0]+b[2] for b in boxes)+12);bottom=min(height,max(b[1]+b[3] for b in boxes)+12)
+        visual='<p>Matching slide render unavailable.</p>'
+        if index in images and right>left and bottom>top:
+            rects=''
+            for key,color in [('label_box_px','#d13e32'),('other_box_px','#d13e32'),('measured_label_box_px','#0a8065'),('measured_other_box_px','#0a8065')]:
+                if item.get(key):
+                    bx,by,bw,bh=item[key];rects+=f'<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" fill="none" stroke="{color}" stroke-width=".6"/>'
+            visual=f'<svg role="img" aria-label="clearance candidate" viewBox="{left} {top} {right-left} {bottom-top}"><use href="#render-{index}"/>{rects}</svg>'
+        cards.append('<section><h2>'+html.escape(item['label']+' / '+item['obstacle'])+'</h2><p>'+html.escape(item['diagnostic']+'; '+', '.join(item.get('candidate_sources',[])))+'</p>'+visual+'</section>')
+    output.parent.mkdir(parents=True,exist_ok=True)
+    output.write_text('<!doctype html><meta charset="utf-8"><title>Clearance review</title><style>body{font:16px Arial;max-width:1100px;margin:2rem auto}section{border:1px solid #ccc;padding:1rem;margin:1rem 0}section svg{width:100%;max-height:280px}</style><h1>Text clearance review</h1><p>Red: declared text frame. Green: actual PowerPoint text bounds. Candidates remain findings, not automatic waivers or glyph-level proof.</p>'+definitions+(''.join(cards) or '<p>No declared geometry collision candidates.</p>'),encoding='utf-8')
+    return str(output.resolve())

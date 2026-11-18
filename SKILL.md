@@ -2,7 +2,7 @@
 name: editable-ppt-redraw
 description: Rebuild reference images, PDF pages or existing visuals as editable PowerPoint (default), SVG, draw.io or other native formats, with faithful reconstruction, authorized redesign and visual QA. Also use for 图片转ppt skill, 图转可编辑 PPT and 参考图转可编辑矢量图.
 metadata:
-  version: "3.20.0"
+  version: "3.26.0"
 ---
 
 # Editable Visual Reconstruction
@@ -55,12 +55,13 @@ Qualify one installed target-owning route via [backend-routing](references/backe
 For multi-object reconstruction use [source-assembly](references/source-assembly.md):
 its prepare/build entrypoint consumes source inventory and extracted components/layers,
 then calls existing emitters in one coordinate/paint-order plan. Use that executable
-route for its supported native PPTX inputs; keep other qualified targets on the
+route for supported native/approved hybrid PPTX inputs and semantic editing groups; keep other qualified targets on the
 same source/scene APIs. Do not replace source extraction with generic templates or
 reuse a candidate deck as construction input. Dense work reviews modules first.
-Choose binary ownership for hard pieces, and the explicit soft-layer route for
-qualified matte/foreground estimation. Occlusion is not background; only approved
-smooth color fields may be interpolated, never hidden anatomy.
+Choose binary ownership for hard pieces; [source-fields](references/source-fields.md)
+fits smooth colors and independent coverage to native Paint with bounded automatic
+stop selection. Soft-layer extraction estimates matte/foreground, not hidden anatomy;
+occlusion is not transparent background.
 
 Text, quantitative marks, legends and critical relationships stay native.
 Pictures require the approved editing scope; small size, tiling or large native
@@ -71,4 +72,5 @@ Run applicable machine checks through [quality-runner](references/quality-runner
 on the saved/reopened artifact; perform source/render and editor review under
 [quality-rubric](references/quality-rubric.md). Reuse unchanged source evidence, not
 stale output results. Apply the profile's bounded correction and stop conditions.
+For a measured text defect, use the [text correction route](references/text-fidelity.md#office-layout-and-text-correction).
 Report actual results and limitations, never an inferred overall PASS.

@@ -4,9 +4,13 @@ Read only when constructing native part trees, gradients, compositing or shared 
 
 ## Executable native parts and Paint
 
-Use `native_components.add_manifest_component(slide, manifest, component_id,
-x, y, width, height, base_dir=manifest_directory)` to construct an inventory-backed
-tree in the existing builder. Placement uses inches and aspect-preserving contain.
+For a whole assembly create one `native_components.ManifestComponentBuilder(manifest,
+base_dir=manifest_directory)`, then call `builder.add(slide, component_id, x, y,
+width, height)`. It owns a deep manifest snapshot, preflights all trees/contracts
+once and rechecks source bytes and selected sampled Paint before each emission.
+No global cache survives a new build. The standalone `add_manifest_component`
+API remains available and performs the same complete preflight for its one call.
+Placement uses inches and aspect-preserving contain.
 The part-tree schema is defined in [native-component-schema](native-component-schema.md).
 For isolated geometry fixtures the lower-level `add_native_component` accepts the
 same component value; production source-sampled work uses the manifest entrypoint,
@@ -82,12 +86,10 @@ not dynamically recomposite this fill. Do not apply it to a differently bounded
 partial overlay, an unknown backdrop, a spatial mask, or a group of overlapping
 children and claim equivalent rendering.
 
-Paint is independent of path geometry. Changing a stop must not refit a contour,
-move a nucleus or reorder layers. Source sampling is defined only in
-[appearance-fidelity.md](appearance-fidelity.md); its returned Paint carries a
-`source_samples` provenance record and is assigned directly to the leaf fill.
-Do not replace continuous shading with hundreds of flat regions unless that
-approximation and editing scope are explicitly selected.
+Paint changes do not refit geometry or reorder parts. Direct patch sampling uses
+[appearance-fidelity](appearance-fidelity.md) and `source_samples`; calculated
+stops use [source-fields](source-fields.md) and a fitting receipt. Neither is a
+palette-band claim. Select any discrete approximation and editing scope explicitly.
 
 For an independently established **centered circular** source profile, use
 `native_paint.centered_radial_paint(stops, radius, bounds)` with actual owner bounds

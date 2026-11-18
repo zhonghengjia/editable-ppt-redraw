@@ -41,6 +41,10 @@ maps every visible item to its module, geometry, role and representation.
 `bbox` is `[left,top,width,height]` in **manifest canvas coordinates**; source
 pixel crops/landmarks in specialist contracts use their separately declared frame.
 
+- `source_inventory[].role`: `text`, `shape`, `icon`, `connector`, `image`,
+  `evidence`, `decoration`, `chart`, or `table`. A picture uses `image`; module
+  `type: illustration` and asset `content_class: illustration` describe different
+  fields and are not inventory roles.
 - `source_inventory[].representation`: `native_primitive`, `native_composite`,
   `source_crop`, `evidence_raster`, or `component_raster`. The last requires hybrid.
   Legacy native-policy source/evidence rasters reference `raster_exceptions`;

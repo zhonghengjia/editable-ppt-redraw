@@ -1,5 +1,122 @@
 # Changes
 
+## 3.26.0 — 2026-11-18 — diagnose and correct native text layout
+
+- Collect rendered line counts with existing PowerPoint evidence. Report named
+  native text objects with unexpected line counts or text bounds outside the frame.
+- Add `revise-text` for reviewed frame or uniform size changes in a new canonical
+  manifest. Preserve the original observations and rebuild with the existing
+  pipeline and fresh Office verification.
+- Record the comparison of 22 GitHub projects and rank stars and uploaded release
+  asset downloads separately.
+
+## 3.25.0 — 2026-11-15 — source-text measurement before reconstruction
+
+- Add optional `measure-text` to the existing reconstruction pipeline. Read source
+  text inventory once; emit hash-bound crop/mask/overview advice without changing
+  canonical geometry or making cloud OCR calls. Explicit context padding separates
+  a measurement neighborhood from a text placement box.
+- Adapt MIT Otsu measurement from ningzimu/image-to-editable-ppt-skill with retained
+  license. Preserve border-connected and tiny ink instead of automatic cleanup;
+  report low contrast, rules, edge contact and inconsistent bands.
+- Optional local TTF/OTF face and glyph-coverage checks support measured string
+  width/height size suggestions; no Latin/CJK em constants, automatic role clusters,
+  mandatory runtime or new prepare/build state. Mixed-size runs may still yield
+  aggregate advice and require source inspection.
+- Record targeted upstream architecture/code comparisons and actual counterexamples.
+  Preserve existing target renderer, asset binding and source-first reconstruction.
+
+## 3.24.0 — 2026-11-07 — joint colors and reusable source/editor evidence
+
+- Add explicit fixed-alpha multilevel foreground/background colors using a
+  NumPy adaptation of PyMatting, with MIT attribution. Preserve existing
+  constant/affine recipes; versioned nine-PNG candidates retain inferred identity,
+  hard color anchors, numerical diagnostics and the existing common reader.
+- Share Office evidence validation across clearance and reopened-layout use.
+  Add actual-text-overflow candidates without duplicating existing findings;
+  scope geometry qualification to contract-selected objects while retaining
+  unrelated limitations. Do not infer routed segments from extents.
+- Extend the existing PDF source extractor with opt-in text/character/font and
+  image-instance transform evidence. Preserve unresolved paint operations,
+  hidden/repeated cases and NOT_PERFORMED conversion status.
+- Move soft-layer details into a conditional operation reference, keeping the
+  common assembly entrypoint and existing anchors. No new model, cloud service,
+  alternate builder or mandatory OCR dependency.
+- Base decisions on 24 pinned upstream source reviews; retain baseline/failed
+  real-image evidence. The update guide separates 508-test technical coverage,
+  actual Office/independent use checks and still-unapproved C3 component fidelity.
+
+## 3.23.0 — 2026-10-23 — unified hybrid assembly and actionable editor evidence
+
+- Extend the existing prepare/build scene to approved independent picture units,
+  flat semantic editing groups and qualified rectangular native bindings. Preserve
+  paint order, native-required roles, original-source provenance and portable inputs.
+- Add explicit observed affine-background fitting to the same alpha/foreground
+  extractor; constant recipes remain compatible. No automatic sampling, model
+  switching, source-specific code, new dependency or hidden anatomy recovery.
+- Let hybrid preparation consume that exact seven-file estimated source-layer
+  receipt instead of mislabeling inferred alpha or recropping original RGB.
+- Record native composite group coverage without changing leaf-level picture
+  replacement checks or permitting raster descendants in native-required units.
+- Add reusable read-only PowerPoint rendering/bounds evidence and isolated
+  edit/save/reopen probes. Text-only slides now enter clearance checks; localized
+  previews distinguish text-frame padding from measured-text-bound intersections
+  without waiving findings. Stale layouts no longer reach downstream checks.
+- Update existing operation authorities in place; entrypoint remains feature-routed.
+  Clarify inventory roles separately from asset/module classes. Plain native
+  rectangles and bound links block undeclared theme shadows at creation; explicit
+  native Paint effects and existing deck objects are not globally normalized.
+  Synthetic, real-source and application results/limitations are separated in the
+  [update guide](UPDATE_GUIDE.md). The prior C3 complex-component matting is not
+  certified by the new affine fixture; no Git publication is implied.
+
+## 3.22.0 — 2026-10-22 — shared surface compilation and bounded stop selection
+
+- Solve only observable profile columns on existing source support; disclose
+  unobserved coefficient extension instead of rejecting circular/holed domains.
+- Compile independent color/coverage coordinates through the existing fill and
+  alpha-mask emitter. Coverage-weighted direction is invariant to invisible RGB;
+  prevent group masks from changing independently painted descendants.
+- Accept an explicit estimated-layer receipt in field fitting; freeze and recheck
+  all seven layer outputs, retaining estimated provenance and original source.
+- Compile bulk native components from one private preflighted manifest snapshot,
+  retaining per-component source/paint/name checks and the standalone API.
+  Twenty-component tree parsing drops from 420 to 40 measured invocations.
+- Replace manual stop-count guessing with optional bounded `auto` (4..16), after
+  an independent use test exposed non-nested uniform-grid failures. Search minimum
+  total stops with cached per-profile candidates; no error-limit or model changes.
+- Remove the unused joint-profile optimization and keep shared input validation.
+  Update existing operation authorities in place; no image-specific rule, new
+  model, dependency, serializer or permission to publish.
+- Actual PowerPoint 16.0 multi-background renders and native edit/save/reopen
+  were verified; 421 tests passed without failures or skips. Circle antialiasing differences and the initial forward-test
+  failure remain disclosed. The corrected forward-use continuation generated
+  a native candidate with no pictures. Complex prior biological images are not
+  certified by these controlled tests. See the [update guide](UPDATE_GUIDE.md)
+  and [20-project source review](research/2026-10-22-source-fields-and-assembly.md).
+
+## 3.21.0 — 2026-10-03 — source fields to continuous native Paint
+
+- Fit observed smooth colors on fixed, source-grounded geometry as solid,
+  physical-coordinate linear or centered circular Paint. Fit real RGB/alpha
+  independently; evaluate quantized native stops on every owned source pixel.
+  No palette bands, new model, runtime installation or alternate serializer.
+- Add optional construction-v3 `field_fit` to the existing native-component
+  prepare/review/build route. Freeze original support, source and recipe; recompute
+  compiled Paint before export. Existing binary, soft-layer and explicit Paint
+  routes retain their behavior. Geometry is never inferred by the color fitter.
+- Reuse qualified image reading and prevent repeated alpha on owners/ancestors/
+  inheriting leaves. Reject missing or rebound source evidence before output.
+- Replace operation guidance in place, with one conditional field-fit reference;
+  keep the 20-project source review out of routine redraw context.
+- 404 tests pass without skips. Fifteen controlled source-to-PPTX cases were
+  rendered by PowerPoint 16.0; maximum RGB error was 3/255. Application-native
+  move/color-edit/save/reopen passed. An independent skill-use test built an
+  eight-stop component without inspecting the implementation or test answers.
+- This does **not** solve arbitrary mixed biological shading: the previous
+  estimated ROS layer failed the fixed centered-radial diagnostic. See the
+  [source review, decisions and qualification boundaries](research/2026-10-03-continuous-fields.md).
+
 ## 3.20.0 — 2026-09-12 — explicit source layers and bounded smooth-field reconstruction
 
 - Separate binary ownership, estimated continuous alpha and straight foreground

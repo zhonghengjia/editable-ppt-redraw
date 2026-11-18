@@ -6,6 +6,7 @@ No network, image generation, source-mask extraction or installation is performe
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import math
 from pathlib import Path
@@ -204,8 +205,8 @@ def add_native_component(slide, component, x, y, width, height):
                 slide_part=str(slide.part.partname))
 
 
-def add_manifest_component(slide, manifest, component_id, x, y, width, height, *, base_dir):
-    """Consume the same manifest; verify sampled paints against immutable source."""
+def _manifest_preflight(manifest, base_dir):
+    """Whole-manifest invariants, once per frozen assembly context."""
     from component_fidelity import validate_contract as regional_contract, digest, read_image
     from appearance_fidelity import validate_contract as appearance_contract
     errors = validate_contract(manifest) + regional_contract(manifest) + appearance_contract(manifest)
@@ -215,24 +216,61 @@ def add_manifest_component(slide, manifest, component_id, x, y, width, height, *
         contract=manifest.get(field)
         if contract is not None:
             source=Path(base_dir)/manifest['source']['path']
-            if digest(source)!=contract['source_sha256'] or list(read_image(source).size)!=contract['source_size']:
+            with read_image(source) as image:size=list(image.size)
+            if digest(source)!=contract['source_sha256'] or size!=contract['source_size']:
                 raise ValueError(field+': source hash/size mismatch before construction')
-    matches = [c for c in manifest.get('native_components', []) if c['id'] == component_id]
-    if len(matches) != 1:
-        raise ValueError('unknown native component')
-    component = matches[0]
+
+
+def _verify_component_samples(component, source):
     def verify(nodes):
         for node in nodes:
             if 'children' in node:
                 for sampled in sampled_paints(node.get('group_fill')):
                     from appearance_fidelity import verify_sampled_paint
-                    verify_sampled_paint(Path(base_dir) / manifest['source']['path'], sampled)
+                    verify_sampled_paint(source, sampled)
                 verify(node['children'])
             else:
                 for field in ('fill', 'stroke'):
                     paint = node.get(field)
                     for sampled in sampled_paints(paint):
                         from appearance_fidelity import verify_sampled_paint
-                        verify_sampled_paint(Path(base_dir) / manifest['source']['path'], sampled)
+                        verify_sampled_paint(source, sampled)
     verify(component['parts'])
-    return add_native_component(slide, component, x, y, width, height)
+
+
+class ManifestComponentBuilder:
+    """One immutable manifest snapshot, linear total tree preflight.
+
+    No process-global cache and no caller flag that disables validation. Standalone
+    calls still get a complete preflight. Each selected component rechecks sampled
+    Paint and source bytes, then uses the unchanged serializer/name/ID checks.
+    """
+    def __init__(self, manifest, *, base_dir):
+        snapshot=copy.deepcopy(manifest)
+        _manifest_preflight(snapshot,base_dir)
+        self._components={c['id']:c for c in snapshot.get('native_components',[])}
+        source=snapshot.get('source',{})
+        self._source=Path(base_dir)/source['path'] if source.get('path') else None
+        hashes={source['sha256']} if source.get('sha256') else set()
+        hashes.update(snapshot[key]['source_sha256'] for key in ('regional_fidelity','appearance_fidelity')
+                      if snapshot.get(key) is not None)
+        if len(hashes)>1:raise ValueError('manifest source hashes disagree')
+        self._source_hash=next(iter(hashes),None)
+
+    def output_name(self, identity):
+        if identity not in self._components:raise ValueError('unknown native component')
+        return self._components[identity]['output_name']
+
+    def add(self, slide, identity, x, y, width, height):
+        self.output_name(identity)
+        if self._source_hash and (self._source is None or hashlib.sha256(self._source.read_bytes()).hexdigest()!=self._source_hash):
+            raise ValueError('source hash changed after manifest preflight')
+        component=self._components[identity]
+        _verify_component_samples(component,self._source)
+        return add_native_component(slide,component,x,y,width,height)
+
+
+def add_manifest_component(slide, manifest, component_id, x, y, width, height, *, base_dir):
+    """Standalone compatibility API; bulk assemblies reuse one builder snapshot."""
+    return ManifestComponentBuilder(manifest,base_dir=base_dir).add(
+        slide,component_id,x,y,width,height)
